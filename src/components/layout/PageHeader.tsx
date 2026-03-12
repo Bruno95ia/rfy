@@ -1,0 +1,68 @@
+import Link from 'next/link';
+import { ChevronRight } from 'lucide-react';
+import { cn } from '@/lib/cn';
+
+export interface BreadcrumbItem {
+  label: string;
+  href?: string;
+}
+
+interface PageHeaderProps {
+  breadcrumbs?: BreadcrumbItem[];
+  title: string;
+  subtitle?: React.ReactNode;
+  actions?: React.ReactNode;
+  className?: string;
+}
+
+export function PageHeader({
+  breadcrumbs = [],
+  title,
+  subtitle,
+  actions,
+  className,
+}: PageHeaderProps) {
+  return (
+    <header className={cn('space-y-5', className)}>
+      {breadcrumbs.length > 0 && (
+        <nav
+          className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-1.5 text-xs font-medium text-[var(--color-text-muted)] shadow-[var(--shadow-sm)]"
+          aria-label="Breadcrumb"
+        >
+          {breadcrumbs.map((item, i) => (
+            <span key={item.label + String(i)} className="flex items-center gap-1.5">
+              {i > 0 && (
+                <ChevronRight className="h-3.5 w-3.5 shrink-0 text-[var(--color-text-muted)]/70" />
+              )}
+              {item.href ? (
+                <Link
+                  href={item.href}
+                  className="transition-colors hover:text-[var(--color-text)]"
+                >
+                  {item.label}
+                </Link>
+              ) : (
+                <span className="font-medium text-[var(--color-text)]">{item.label}</span>
+              )}
+            </span>
+          ))}
+        </nav>
+      )}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-[var(--color-text)] sm:text-3xl">
+            {title}
+          </h1>
+          {subtitle && (
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[var(--color-text-muted)]">
+              {subtitle}
+            </p>
+          )}
+        </div>
+        {actions && (
+          <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>
+        )}
+      </div>
+    </header>
+  );
+}

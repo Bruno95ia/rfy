@@ -1,0 +1,207 @@
+@import "tailwindcss";
+
+:root {
+  --rfy-color-background: #f3f6fb;
+  --rfy-color-surface: #ffffff;
+  --rfy-color-surface-muted: #f8fafc;
+  --rfy-color-surface-elevated: #ffffff;
+  --rfy-color-text: #0f172a;
+  --rfy-color-text-muted: #475569;
+  --rfy-color-border: #e2e8f0;
+  --rfy-color-border-strong: #cbd5e1;
+  --rfy-color-primary: #4f46e5;
+  --rfy-color-primary-hover: #4338ca;
+  --rfy-color-primary-soft: #eef2ff;
+  --rfy-color-primary-foreground: #ffffff;
+  --rfy-color-success: #059669;
+  --rfy-color-success-soft: #d1fae5;
+  --rfy-color-success-foreground: #065f46;
+  --rfy-color-warning: #d97706;
+  --rfy-color-warning-soft: #fef3c7;
+  --rfy-color-warning-foreground: #92400e;
+  --rfy-color-danger: #dc2626;
+  --rfy-color-danger-soft: #fee2e2;
+  --rfy-color-danger-foreground: #991b1b;
+  --rfy-color-overlay: rgba(15, 23, 42, 0.56);
+
+  --color-background: var(--rfy-color-background);
+  --color-surface: var(--rfy-color-surface);
+  --color-surface-muted: var(--rfy-color-surface-muted);
+  --color-surface-elevated: var(--rfy-color-surface-elevated);
+  --color-text: var(--rfy-color-text);
+  --color-text-muted: var(--rfy-color-text-muted);
+  --color-muted: var(--rfy-color-surface-muted);
+  --color-muted-foreground: var(--rfy-color-text-muted);
+  --color-border: var(--rfy-color-border);
+  --color-border-strong: var(--rfy-color-border-strong);
+  --color-primary: var(--rfy-color-primary);
+  --color-primary-hover: var(--rfy-color-primary-hover);
+  --color-primary-soft: var(--rfy-color-primary-soft);
+  --color-primary-foreground: var(--rfy-color-primary-foreground);
+  --color-success: var(--rfy-color-success);
+  --color-success-soft: var(--rfy-color-success-soft);
+  --color-success-foreground: var(--rfy-color-success-foreground);
+  --color-warning: var(--rfy-color-warning);
+  --color-warning-soft: var(--rfy-color-warning-soft);
+  --color-warning-foreground: var(--rfy-color-warning-foreground);
+  --color-danger: var(--rfy-color-danger);
+  --color-danger-soft: var(--rfy-color-danger-soft);
+  --color-danger-foreground: var(--rfy-color-danger-foreground);
+  --color-overlay: var(--rfy-color-overlay);
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 6px 12px -4px rgba(15, 23, 42, 0.08), 0 2px 4px -2px rgba(15, 23, 42, 0.05);
+  --shadow-lg: 0 14px 24px -8px rgba(15, 23, 42, 0.1), 0 6px 10px -6px rgba(15, 23, 42, 0.05);
+  --shadow-xl: 0 20px 25px -5px rgba(15, 23, 42, 0.06), 0 8px 10px -6px rgba(15, 23, 42, 0.04);
+
+  /* Legacy aliases for compatibility */
+  --background: var(--color-background);
+  --foreground: var(--color-text);
+  --foreground-muted: var(--color-text-muted);
+  --border: var(--color-border);
+  --border-hover: var(--color-border-strong);
+  --surface: var(--color-surface);
+  --surface-muted: var(--color-surface-muted);
+  --primary: var(--color-primary);
+  --primary-hover: var(--color-primary-hover);
+  --primary-muted: var(--color-primary-soft);
+  --primary-foreground: var(--color-primary-foreground);
+  --success: var(--color-success);
+  --success-muted: var(--color-success-soft);
+  --warning: var(--color-warning);
+  --warning-muted: var(--color-warning-soft);
+  --danger: var(--color-danger);
+  --danger-muted: var(--color-danger-soft);
+  --radius: var(--radius-md);
+}
+
+@theme inline {
+  --color-background: var(--rfy-color-background);
+  --color-foreground: var(--rfy-color-text);
+  --color-surface: var(--rfy-color-surface);
+  --color-surface-muted: var(--rfy-color-surface-muted);
+  --color-surface-elevated: var(--rfy-color-surface-elevated);
+  --color-border: var(--rfy-color-border);
+  --color-border-strong: var(--rfy-color-border-strong);
+  --color-primary: var(--rfy-color-primary);
+  --color-primary-hover: var(--rfy-color-primary-hover);
+  --color-primary-soft: var(--rfy-color-primary-soft);
+  --color-success: var(--rfy-color-success);
+  --color-success-soft: var(--rfy-color-success-soft);
+  --color-success-foreground: var(--rfy-color-success-foreground);
+  --color-warning: var(--rfy-color-warning);
+  --color-warning-soft: var(--rfy-color-warning-soft);
+  --color-warning-foreground: var(--rfy-color-warning-foreground);
+  --color-danger: var(--rfy-color-danger);
+  --color-danger-soft: var(--rfy-color-danger-soft);
+  --color-danger-foreground: var(--rfy-color-danger-foreground);
+  --color-muted: var(--rfy-color-surface-muted);
+  --color-muted-foreground: var(--rfy-color-text-muted);
+  --color-overlay: var(--rfy-color-overlay);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background:
+    radial-gradient(1400px 520px at 0% 0%, rgba(238, 242, 255, 0.85) 0%, transparent 52%),
+    radial-gradient(1100px 420px at 100% 0%, rgba(224, 242, 254, 0.45) 0%, transparent 48%),
+    var(--color-background);
+  color: var(--color-text);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  min-height: 100vh;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Selection */
+::selection {
+  background: rgba(79, 70, 229, 0.25);
+  color: inherit;
+}
+
+/* Transições e superfícies */
+@layer utilities {
+  .animate-in {
+    animation: animate-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  .transition-smooth {
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .app-surface {
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    box-shadow: var(--shadow-sm);
+    border-radius: var(--radius-lg);
+  }
+
+  .app-surface-elevated {
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    box-shadow: var(--shadow-md);
+    border-radius: var(--radius-lg);
+  }
+}
+
+@keyframes animate-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Skeleton loading elegante */
+@keyframes skeleton-pulse {
+  0%, 100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/* Focus ring */
+.focus-ring:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-surface), 0 0 0 4px var(--color-primary);
+}

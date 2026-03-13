@@ -106,6 +106,9 @@ export async function sendReportEmail(
 const INVITE_FROM_NAME = process.env.INVITE_FROM_NAME ?? process.env.ALERT_FROM_NAME ?? 'RFY';
 const INVITE_FROM_EMAIL = process.env.INVITE_FROM_EMAIL ?? process.env.ALERT_FROM_EMAIL ?? 'convites@rfy.local';
 
+const FORMS_FROM_NAME = process.env.FORMS_FROM_NAME ?? INVITE_FROM_NAME;
+const FORMS_FROM_EMAIL = process.env.FORMS_FROM_EMAIL ?? INVITE_FROM_EMAIL;
+
 /**
  * Envia email de convite para organização.
  * @param to - Email do convidado
@@ -173,3 +176,73 @@ export async function sendInviteEmail(
     return { ok: false, error };
   }
 }
+
+/**
+ * Envia email com link de formulário identificado.
+ * @param to - Email do respondente
+ * @param name - Nome do respondente (opcional, usado no corpo)
+ * @param formName - Nome amigável do formulário
+ * @param formUrl - URL completa para resposta (ex: https://app.exemplo.com/forms/xyz?token=xxx)
+ */
+export async function sendFormInviteEmail(
+  to: string,
+  name: string | null,
+  formName: string,
+  formUrl: string
+): Promise<{ ok: boolean; error?: string }> {
+  const key = process.env.RESEND_API_KEY;
+  if (!key) {
+    // eslint-disable-next-line no-console
+    console.warn('[forms] RESEND_API_KEY not set; skipping form email to', to);
+    return { ok: true };
+  }
+
+  const subject = `Convite para responder "${formName}"`;
+  const greeting = name?.trim() ? `Olá, ${name.trim()}!` : 'Olá!';
+  const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Formulário RFY</title></head>
+<body style="font-family: system-ui, sans-serif; line-height: 1.5; color: #1e293b; max-width: 560px; margin: 0 auto; padding: 24px;">
+  <p>${greeting}</p>
+  <p>Você foi convidado(a) a responder o formulário <strong>${formName}</strong>.</p>
+  <p style="margin: 24px 0;">
+    <a href="${formUrl}" style="display: inline-block; background: #4f46e5; color: white; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: 600;">Responder formulário</a>
+  </p>
+  <p style="font-size: 14px; color: #64748b;">Este link é pessoal e permite identificar suas respostas.</p>
+  <p style="font-size: 12px; color: #94a3b8;">— RFY</p>
+</body>
+</html>`;
+
+  const text = `${greeting} Você foi convidado(a) a responder o formulário "${formName}". Acesse: ${formUrl}`;
+
+  try {
+    const res = await withRetry(
+      () =>
+        fetch(RESEND_API, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${key}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            from: `${FORMS_FROM_NAME} <${FORMS_FROM_EMAIL}>`,
+            to: [to],
+            subject,
+            html,
+            text,
+          }),
+        }),
+      { maxAttempts: 3, baseMs: 1000 }
+    );
+    if (!res.ok) {
+      const err = await res.text();
+      return { ok: false, error: `${res.status}: ${err}` };
+    }
+    return { ok: true };
+  } catch (e) {
+    const error = e instanceof Error ? e.message : String(e);
+    return { ok: false, error };
+  }
+}
+

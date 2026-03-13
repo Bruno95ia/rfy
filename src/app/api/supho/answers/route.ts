@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { requireApiAuth, requireApiCampaignAccess } from '@/lib/auth';
 
 /** POST: insere respostas em lote para um respondente (verifica acesso via respondent → campaign → org) */
 export async function POST(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+  const auth = await requireApiAuth();
+  if (!auth.ok) return auth.response;
 
   const body = await req.json();
 
@@ -48,12 +47,8 @@ export async function POST(req: NextRequest) {
     .single();
   if (!campaign) return NextResponse.json({ error: 'Campanha não encontrada' }, { status: 404 });
 
-  const { data: members } = await supabase
-    .from('org_members')
-    .select('org_id')
-    .eq('org_id', campaign.org_id)
-    .eq('user_id', user.id);
-  if (!members?.length) return NextResponse.json({ error: 'Sem acesso' }, { status: 403 });
+  const access = await requireApiCampaignAccess(respondent.campaign_id);
+  if (!access.ok) return access.response;
 
   const rows = answers
     .filter((a) => a?.question_id && typeof a?.value === 'number' && a.value >= 1 && a.value <= 5)

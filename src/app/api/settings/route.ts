@@ -1,9 +1,8 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getOrgIdForUser, userHasOrgAccess, type OrgRole } from '@/lib/auth';
+import { getOrgIdForUser, requireApiAuth, userHasOrgAccess, type OrgRole } from '@/lib/auth';
 import { encrypt } from '@/lib/crypto';
 import { appendAuditLog } from '@/lib/billing';
 import { computeNextRunAt } from '@/lib/reports/next-run';
@@ -23,12 +22,7 @@ function hasRole(role: OrgRole, min: RoleGate): boolean {
 }
 
 async function resolveOrgForUser(userId: string): Promise<string | null> {
-  const supabase = await createClient();
-  let orgId = (
-    await supabase.from('org_members').select('org_id').limit(1)
-  ).data?.[0]?.org_id;
-  if (!orgId) orgId = await getOrgIdForUser(userId);
-  return orgId ?? null;
+  return (await getOrgIdForUser(userId)) ?? null;
 }
 
 async function resolveUserRole(userId: string, orgId: string): Promise<OrgRole> {
@@ -69,13 +63,9 @@ function maskTarget(target: string): string {
 }
 
 export async function GET() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
-  }
+  const auth = await requireApiAuth();
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
 
   const orgId = await resolveOrgForUser(user.id);
   if (!orgId) {
@@ -413,13 +403,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
-  }
+  const auth = await requireApiAuth();
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
 
   const orgId = await resolveOrgForUser(user.id);
   if (!orgId) {

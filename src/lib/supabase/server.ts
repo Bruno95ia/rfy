@@ -1,35 +1,24 @@
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
+/**
+ * Cliente de servidor: sessão via cookie (getCurrentUser) e dados via PostgreSQL (createAdminClient).
+ * Substitui createServerClient do Supabase; não depende mais de NEXT_PUBLIC_SUPABASE_*.
+ */
 
-function getEnv(name: string): string {
-  const value = process.env[name];
-  if (value == null || value === '') {
-    throw new Error(
-      `Variável de ambiente ausente: ${name}. Configure em .env.local (veja .env.example).`
-    );
-  }
-  return value;
-}
+import { cookies } from 'next/headers';
+import { getSessionUser, getSessionCookieName } from '@/lib/auth-session';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function createClient() {
-  const cookieStore = await cookies();
-  const supabaseUrl = getEnv('NEXT_PUBLIC_SUPABASE_URL');
-  const supabaseAnonKey = getEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY');
+  const store = await cookies();
+  const sessionId = store.get(getSessionCookieName())?.value ?? null;
+  const user = await getSessionUser(sessionId);
 
-  return createServerClient(supabaseUrl, supabaseAnonKey, {
-    cookies: {
-      getAll() {
-        return cookieStore.getAll();
-      },
-      setAll(cookiesToSet: { name: string; value: string; options?: Record<string, unknown> }[]) {
-        try {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            cookieStore.set(name, value, options)
-          );
-        } catch {
-          // Ignore in middleware
-        }
-      },
+  return {
+    auth: {
+      getUser: async () => ({
+        data: { user: user ? { id: user.id, email: user.email } : null },
+        error: null,
+      }),
     },
-  });
+    from: (table: string) => createAdminClient().from(table),
+  };
 }

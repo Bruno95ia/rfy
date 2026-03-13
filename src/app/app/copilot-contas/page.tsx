@@ -10,10 +10,7 @@ export default async function CopilotContasPage() {
   const { user } = await requireAuth();
   const supabase = await createClient();
 
-  let orgId = (await supabase.from('org_members').select('org_id').limit(1)).data?.[0]?.org_id;
-  if (!orgId) {
-    orgId = await getOrgIdForUser(user.id);
-  }
+  const orgId = await getOrgIdForUser(user.id);
 
   let companies: string[] = [];
   if (orgId) {
@@ -23,9 +20,10 @@ export default async function CopilotContasPage() {
       .eq('org_id', orgId)
       .eq('status', 'open')
       .not('company_name', 'is', null);
-    const names = (opps ?? [])
+    const rows = (opps ?? []) as { company_name?: string | null }[];
+    const names = rows
       .map((o) => (o.company_name ?? '').trim())
-      .filter(Boolean);
+      .filter((s): s is string => Boolean(s));
     companies = [...new Set(names)].sort((a, b) => a.localeCompare(b));
   }
 

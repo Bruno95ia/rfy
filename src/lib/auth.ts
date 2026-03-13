@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server';
+import { getCurrentUser } from '@/lib/auth-session';
 import { redirect } from 'next/navigation';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
@@ -19,33 +19,63 @@ function isMissingRoleColumnError(message?: string): boolean {
   );
 }
 
-/**
- * Obtém o usuário autenticado ou redireciona para /login
- */
-export async function requireAuth() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+/** Usuário no formato esperado pelas rotas (id + email). */
+export type AuthUser = { id: string; email: string };
 
+type ApiAuthResult =
+  | { ok: true; user: AuthUser }
+  | { ok: false; response: NextResponse };
+
+type ApiOrgAccessResult =
+  | { ok: true; user: AuthUser; orgId: string }
+  | { ok: false; response: NextResponse };
+
+type ApiCampaignAccessResult =
+  | {
+      ok: true;
+      user: AuthUser;
+      orgId: string;
+      campaign: { id: string; org_id: string };
+    }
+  | { ok: false; response: NextResponse };
+
+/**
+ * Obtém o usuário autenticado ou redireciona para /login.
+ * Não usa mais Supabase; sessão via cookie (app_sessions).
+ */
+export async function requireAuth(): Promise<{ user: AuthUser }> {
+  const user = await getCurrentUser();
   if (!user) {
     redirect('/login');
   }
-
-  return { user, supabase };
+  return { user };
 }
 
 /**
- * Provisiona org "Default" e org_members no primeiro login do usuário
+ * Para API routes: obtém o usuário autenticado ou retorna 401 em formato JSON.
+ */
+export async function requireApiAuth(): Promise<ApiAuthResult> {
+  const user = await getCurrentUser();
+  if (!user) {
+    return {
+      ok: false,
+      response: NextResponse.json({ error: 'Não autenticado' }, { status: 401 }),
+    };
+  }
+  return { ok: true, user };
+}
+
+/**
+ * Provisiona org "Default" e org_members no primeiro login do usuário.
  */
 export async function provisionOrgOnFirstLogin(userId: string) {
   const admin = createAdminClient();
 
-  const { data: members, error: membersError } = await admin
+  const { data: members, error: membersError } = (await admin
     .from('org_members')
     .select('org_id')
     .eq('user_id', userId)
-    .limit(1);
+    .limit(1)) as { data: { org_id: string }[] | null; error: { message: string } | null };
 
   if (membersError) {
     throw new Error('Falha ao consultar membros: ' + membersError.message);
@@ -55,11 +85,14 @@ export async function provisionOrgOnFirstLogin(userId: string) {
     return members[0].org_id;
   }
 
-  const { data: org, error: orgError } = await admin
+  const orgResult = (await admin
     .from('orgs')
     .insert({ name: 'Default' })
     .select('id')
-    .single();
+    .single()) as { data: { id: string } | null; error: { message: string } | null };
+
+  const org = orgResult.data;
+  const orgError = orgResult.error;
 
   if (orgError || !org) {
     throw new Error('Falha ao criar org: ' + (orgError?.message ?? 'unknown'));
@@ -80,30 +113,106 @@ export async function provisionOrgOnFirstLogin(userId: string) {
     throw new Error('Falha ao adicionar membro: ' + memberUpsert.error.message);
   }
 
-  const roleUpdate = await admin
+  const roleUpdate = (await admin
     .from('org_members')
     .update({ role: 'owner' })
     .eq('org_id', org.id)
-    .eq('user_id', userId);
-
-  if (!roleUpdate.error || isMissingRoleColumnError(roleUpdate.error.message)) {
+    .eq('user_id', userId)) as { error?: { message: string } };
+  const roleErr = roleUpdate.error;
+  if (!roleErr || isMissingRoleColumnError(roleErr.message)) {
     return org.id;
   }
 
-  throw new Error('Falha ao definir role do membro: ' + roleUpdate.error.message);
+  throw new Error('Falha ao definir role do membro: ' + roleErr.message);
 }
 
 /**
- * Obtém org_id do usuário (fallback via admin quando RLS bloqueia)
+ * Obtém org_id do usuário.
  */
 export async function getOrgIdForUser(userId: string): Promise<string | null> {
   const admin = createAdminClient();
-  const { data: members } = await admin
+  const { data } = (await admin
     .from('org_members')
     .select('org_id')
     .eq('user_id', userId)
-    .limit(1);
-  return members?.[0]?.org_id ?? null;
+    .limit(1)) as { data: { org_id: string }[] | null };
+  return data?.[0]?.org_id ?? null;
+}
+
+/**
+ * Para API routes: resolve org do usuário e valida acesso.
+ * Se orgId não for informado, usa a primeira organização do usuário.
+ */
+export async function requireApiUserOrgAccess(
+  orgIdParam: string | null
+): Promise<ApiOrgAccessResult> {
+  const auth = await requireApiAuth();
+  if (!auth.ok) return auth;
+
+  const orgId = orgIdParam?.trim() || (await getOrgIdForUser(auth.user.id));
+  if (!orgId) {
+    return {
+      ok: false,
+      response: NextResponse.json({ error: 'Organização não encontrada' }, { status: 404 }),
+    };
+  }
+
+  if (!(await userHasOrgAccess(auth.user.id, orgId))) {
+    return {
+      ok: false,
+      response: NextResponse.json({ error: 'Sem permissão' }, { status: 403 }),
+    };
+  }
+
+  return { ok: true, user: auth.user, orgId };
+}
+
+/**
+ * Para API routes: resolve campanha SUPHO e valida se o usuário tem acesso à org da campanha.
+ */
+export async function requireApiCampaignAccess(
+  campaignId: string
+): Promise<ApiCampaignAccessResult> {
+  const auth = await requireApiAuth();
+  if (!auth.ok) return auth;
+
+  const admin = createAdminClient();
+  const { data: campaign, error } = (await admin
+    .from('supho_diagnostic_campaigns')
+    .select('id, org_id')
+    .eq('id', campaignId)
+    .maybeSingle()) as {
+    data: { id: string; org_id: string } | null;
+    error: { message: string } | null;
+  };
+
+  if (error) {
+    return {
+      ok: false,
+      response: NextResponse.json({ error: error.message }, { status: 500 }),
+    };
+  }
+
+  if (!campaign) {
+    return {
+      ok: false,
+      response: NextResponse.json({ error: 'Campanha não encontrada' }, { status: 404 }),
+    };
+  }
+
+  if (!(await userHasOrgAccess(auth.user.id, campaign.org_id))) {
+    return {
+      ok: false,
+      response: NextResponse.json({ error: 'Sem acesso a esta campanha' }, { status: 403 }),
+    };
+  }
+
+  return {
+    ok: true,
+    user: auth.user,
+    orgId: campaign.org_id,
+    campaign,
+  };
 }
 
 /**
@@ -114,22 +223,20 @@ export async function requireAuthAndOrgAccess(orgId: string | null): Promise<
   | { ok: true; orgId: string }
   | { ok: false; response: Response }
 > {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
   if (!user) {
     return { ok: false, response: NextResponse.json({ error: 'Não autenticado' }, { status: 401 }) };
   }
   if (!orgId || typeof orgId !== 'string') {
     return { ok: false, response: NextResponse.json({ error: 'org_id obrigatório' }, { status: 400 }) };
   }
-  const { data: members } = await supabase
+  const admin = createAdminClient();
+  const { data: members } = (await admin
     .from('org_members')
     .select('org_id')
     .eq('user_id', user.id)
     .eq('org_id', orgId)
-    .limit(1);
+    .limit(1)) as { data: unknown[] | null };
   let hasAccess = (members?.length ?? 0) > 0;
   if (!hasAccess) {
     hasAccess = await userHasOrgAccess(user.id, orgId);
@@ -141,19 +248,19 @@ export async function requireAuthAndOrgAccess(orgId: string | null): Promise<
 }
 
 /**
- * Verifica se o usuário pertence à org (fallback via admin quando RLS bloqueia)
+ * Verifica se o usuário pertence à org.
  */
 export async function userHasOrgAccess(
   userId: string,
   orgId: string
 ): Promise<boolean> {
   const admin = createAdminClient();
-  const { data } = await admin
+  const { data } = (await admin
     .from('org_members')
     .select('org_id')
     .eq('user_id', userId)
     .eq('org_id', orgId)
-    .limit(1);
+    .limit(1)) as { data: unknown[] | null };
   return (data?.length ?? 0) > 0;
 }
 
@@ -163,12 +270,13 @@ export async function getOrgMemberRole(
 ): Promise<OrgRole | null> {
   const admin = createAdminClient();
   try {
-    const { data, error } = await admin
+    const result = (await admin
       .from('org_members')
       .select('role')
       .eq('user_id', userId)
       .eq('org_id', orgId)
-      .maybeSingle();
+      .maybeSingle()) as { error?: { message: string }; data?: { role?: string } };
+    const { error, data } = result;
     if (error) return isMissingRoleColumnError(error.message) ? 'owner' : null;
     const role = data?.role as OrgRole | undefined;
     if (!role || !(role in ROLE_WEIGHT)) return null;

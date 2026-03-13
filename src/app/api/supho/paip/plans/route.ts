@@ -1,23 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { requireApiUserOrgAccess } from '@/lib/auth';
 
 /** GET: lista planos PAIP da org */
 export async function GET() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
-
-  const { data: members } = await supabase.from('org_members').select('org_id').eq('user_id', user.id).limit(1);
-  const orgId = members?.[0]?.org_id;
-  if (!orgId) return NextResponse.json({ error: 'Organização não encontrada' }, { status: 400 });
+  const auth = await requireApiUserOrgAccess(null);
+  if (!auth.ok) return auth.response;
 
   const admin = createAdminClient();
   const { data, error } = await admin
     .from('supho_paip_plans')
     .select('id, name, status, period_start, period_end, diagnostic_result_id, created_at')
-    .eq('org_id', orgId)
+    .eq('org_id', auth.orgId)
     .order('created_at', { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -26,13 +21,8 @@ export async function GET() {
 
 /** POST: cria plano PAIP */
 export async function POST(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
-
-  const { data: members } = await supabase.from('org_members').select('org_id').eq('user_id', user.id).limit(1);
-  const orgId = members?.[0]?.org_id;
-  if (!orgId) return NextResponse.json({ error: 'Organização não encontrada' }, { status: 400 });
+  const auth = await requireApiUserOrgAccess(null);
+  if (!auth.ok) return auth.response;
 
   const body = await req.json();
 
@@ -60,7 +50,7 @@ export async function POST(req: NextRequest) {
   const { data, error } = await admin
     .from('supho_paip_plans')
     .insert({
-      org_id: orgId,
+      org_id: auth.orgId,
       name,
       diagnostic_result_id,
       period_start,

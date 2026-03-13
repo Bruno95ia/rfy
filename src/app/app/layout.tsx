@@ -13,10 +13,7 @@ export default async function AppLayout({
   await provisionOrgOnFirstLogin(user.id);
 
   const supabase = await createClient();
-  let orgId = (await supabase.from('org_members').select('org_id').limit(1)).data?.[0]?.org_id;
-  if (!orgId) {
-    orgId = await getOrgIdForUser(user.id);
-  }
+  const orgId = await getOrgIdForUser(user.id);
 
   let orgName = 'Minha organização';
   if (orgId) {

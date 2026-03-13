@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { computeDiagnosticResult } from '@/lib/supho/calculations';
 import type { SuphoQuestionAverage } from '@/types/supho';
+import { requireApiCampaignAccess } from '@/lib/auth';
 
 /**
  * POST /api/supho/diagnostic/compute
@@ -27,30 +27,9 @@ export async function POST(req: NextRequest) {
     }
     const campaignId = parsed.data.campaign_id;
 
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
-    }
-
-    const { data: campaign } = await supabase
-      .from('supho_diagnostic_campaigns')
-      .select('id, org_id')
-      .eq('id', campaignId)
-      .single();
-
-    if (!campaign) {
-      return NextResponse.json({ error: 'Campanha não encontrada' }, { status: 404 });
-    }
-
-    const { data: members } = await supabase
-      .from('org_members')
-      .select('org_id')
-      .eq('org_id', campaign.org_id)
-      .eq('user_id', user.id);
-    if (!members?.length) {
-      return NextResponse.json({ error: 'Sem acesso a esta organização' }, { status: 403 });
-    }
+    const access = await requireApiCampaignAccess(campaignId);
+    if (!access.ok) return access.response;
+    const campaign = access.campaign;
 
     const admin = createAdminClient();
 

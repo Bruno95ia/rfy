@@ -3,28 +3,14 @@
  * Dispara job de sincronização PipeRun (Inngest crm/piperun.sync).
  */
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getOrgIdForUser, userHasOrgAccess } from '@/lib/auth';
+import { requireApiUserOrgAccess } from '@/lib/auth';
 import { inngest } from '@/inngest/client';
 
 export async function POST(request: Request) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
-  }
-
-  let orgId = (await supabase.from('org_members').select('org_id').limit(1)).data?.[0]?.org_id;
-  if (!orgId) orgId = await getOrgIdForUser(user.id);
-  if (!orgId) {
-    return NextResponse.json({ error: 'Organização não encontrada' }, { status: 404 });
-  }
-  if (!(await userHasOrgAccess(user.id, orgId))) {
-    return NextResponse.json({ error: 'Sem permissão' }, { status: 403 });
-  }
+  const auth = await requireApiUserOrgAccess(null);
+  if (!auth.ok) return auth.response;
+  const { orgId } = auth;
 
   const admin = createAdminClient();
   const { data: integration } = await admin

@@ -1,4 +1,4 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { AdminDbClientType } from '@/lib/supabase/admin';
 import { createHash } from 'node:crypto';
 import { normalizeStatus, normalizeValue, parseDate } from '@/lib/crm/validate';
 import { dedupeByExternalId } from '@/lib/crm/dedupe';
@@ -250,7 +250,7 @@ export type PersistPiperunResult = {
 };
 
 export async function persistPiperunWebhookData(
-  admin: SupabaseClient,
+  admin: AdminDbClientType,
   payload: PiperunWebhookPayload
 ): Promise<PersistPiperunResult> {
   const dedupedOpps = dedupeByExternalId(

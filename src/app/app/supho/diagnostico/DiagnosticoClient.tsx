@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ClipboardList, Plus, Users, Calculator, ArrowRight, Loader2 } from 'lucide-react';
+import { ClipboardList, Plus, Users, Calculator, ArrowRight, Loader2, Send } from 'lucide-react';
 
 type Campaign = { id: string; name: string; status: string; created_at: string };
 type Question = { id: string; block: string; internal_weight: number; question_text: string | null; item_code: string | null; sort_order: number };
@@ -30,6 +30,9 @@ export function DiagnosticoClient({ orgId, initialCampaigns }: DiagnosticoClient
   const [questionsError, setQuestionsError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [computing, setComputing] = useState(false);
+  const [inviteEmails, setInviteEmails] = useState('');
+  const [inviting, setInviting] = useState(false);
+  const [inviteResult, setInviteResult] = useState<string | null>(null);
 
   const fetchCampaigns = useCallback(async () => {
     const res = await fetch('/api/supho/campaigns');
@@ -157,6 +160,53 @@ export function DiagnosticoClient({ orgId, initialCampaigns }: DiagnosticoClient
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setComputing(false);
+    }
+  };
+
+  const sendInvites = async () => {
+    if (!selectedCampaignId) {
+      setError('Selecione uma campanha antes de disparar convites.');
+      return;
+    }
+    const lines = inviteEmails
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean);
+    if (lines.length === 0) {
+      setError('Adicione ao menos um email (formato: Nome <email@dominio>).');
+      return;
+    }
+    const respondents = lines.map((line) => {
+      const m = line.match(/^(.*)<([^>]+)>$/);
+      if (m) {
+        return { name: m[1].trim(), email: m[2].trim() };
+      }
+      return { name: '', email: line };
+    });
+    setInviting(true);
+    setError(null);
+    setInviteResult(null);
+    try {
+      const res = await fetch('/api/forms/invites', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          form_slug: `supho-${selectedCampaignId}`,
+          form_name: `Diagnóstico SUPHO - ${campaigns.find((c) => c.id === selectedCampaignId)?.name ?? 'Campanha'}`,
+          respondents,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok && res.status !== 207) {
+        throw new Error(data?.error || 'Erro ao disparar convites');
+      }
+      const failed = Array.isArray(data.failed) ? data.failed.length : 0;
+      const success = typeof data.success === 'number' ? data.success : respondents.length - failed;
+      setInviteResult(`Convites enviados: ${success}. Falhas: ${failed}.`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setInviting(false);
     }
   };
 
@@ -298,6 +348,31 @@ export function DiagnosticoClient({ orgId, initialCampaigns }: DiagnosticoClient
                           <ArrowRight className="ml-1 h-4 w-4" />
                         </Button>
                       </Link>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={sendInvites}
+                        disabled={inviting}
+                      >
+                        {inviting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                        Disparar convites por e-mail
+                      </Button>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="block text-xs font-medium text-slate-600">
+                        Lista de emails (um por linha, opcionalmente no formato Nome &lt;email@dominio&gt;)
+                      </label>
+                      <textarea
+                        value={inviteEmails}
+                        onChange={(e) => setInviteEmails(e.target.value)}
+                        rows={4}
+                        className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-mono"
+                        placeholder={'Exemplos:\nMaria Silva <maria@empresa.com>\njoao@empresa.com'}
+                      />
+                      {inviteResult && (
+                        <p className="text-xs text-emerald-700">{inviteResult}</p>
+                      )}
                     </div>
                   </>
                 )}

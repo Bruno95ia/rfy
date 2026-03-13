@@ -1,15 +1,19 @@
 """Configuração do ai-service."""
-from pydantic_settings import BaseSettings
+from pydantic import AliasChoices, Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
 
 
 class Settings(BaseSettings):
     """Configurações carregadas de variáveis de ambiente."""
 
-    database_url: str = "postgresql://postgres:postgres@localhost:5432/postgres"
-    # Suporta AI_DATABASE_URL (docker) ou DATABASE_URL
+    database_url: str = Field(
+        default="postgresql://postgres:postgres@localhost:5432/postgres",
+        validation_alias=AliasChoices("AI_DATABASE_URL", "DATABASE_URL"),
+    )
+    # Suporta AI_DATABASE_URL (preferencial) ou DATABASE_URL.
     redis_url: str | None = None
-    artifacts_path: str = "/artifacts"
+    artifacts_path: str = "artifacts"
     k_anonymity: int = 5
     model_version: str = "v1"
     # Se definido, /train exige header X-Train-API-Key com este valor (ou Authorization: Bearer)
@@ -19,10 +23,11 @@ class Settings(BaseSettings):
     # Se False, erros 500 retornam mensagem genérica (stack trace apenas no log)
     debug: bool = True
 
-    class Config:
-        env_prefix = "AI_"
-        env_file = ".env"
-        extra = "ignore"
+    model_config = SettingsConfigDict(
+        env_prefix="AI_",
+        env_file=(".env.local", ".env", "../.env.local", "../.env"),
+        extra="ignore",
+    )
 
 
 @lru_cache

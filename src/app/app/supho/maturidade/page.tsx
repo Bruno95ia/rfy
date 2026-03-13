@@ -9,10 +9,7 @@ export default async function MaturidadePage() {
   const { user } = await requireAuth();
   const supabase = await createClient();
 
-  let orgId = (await supabase.from('org_members').select('org_id').limit(1)).data?.[0]?.org_id;
-  if (!orgId) {
-    orgId = await getOrgIdForUser(user.id);
-  }
+  const orgId = await getOrgIdForUser(user.id);
   if (!orgId) {
     return (
       <div className="flex items-center justify-center py-24 text-slate-500">

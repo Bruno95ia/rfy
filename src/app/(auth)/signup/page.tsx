@@ -4,7 +4,6 @@ import { Suspense, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowRight, CheckCircle2, Undo2 } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
 import { Logo } from '@/components/ui/Logo';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,20 +25,24 @@ function SignupContent() {
     setError(null);
     setLoading(true);
     try {
-      const supabase = createClient();
-      const baseUrl = window.location.origin;
       const next = inviteToken
         ? `/invite/accept?token=${encodeURIComponent(inviteToken)}`
         : '/app/dashboard';
-      const redirectTo = `${baseUrl}/api/auth/callback?next=${encodeURIComponent(next)}`;
-      const { error: signUpError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: { emailRedirectTo: redirectTo },
+      const formData = new FormData();
+      formData.set('email', email);
+      formData.set('password', password);
+      const res = await fetch(`/api/auth/signup?next=${encodeURIComponent(next)}`, {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
       });
-      if (signUpError) throw signUpError;
-      router.push(next);
-      router.refresh();
+      const data = (await res.json()) as { ok?: boolean; next?: string; error?: string };
+      if (data.ok && data.next) {
+        router.push(data.next);
+        router.refresh();
+        return;
+      }
+      setError(data.error ?? 'Erro ao criar conta');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao criar conta');
     } finally {

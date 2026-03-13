@@ -11,13 +11,13 @@ import {
 } from '@/lib/upload-process';
 import { computeAndPersistReport } from '@/lib/report-compute-persist';
 import { NextResponse } from 'next/server';
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { AdminDbClientType } from '@/lib/supabase/admin';
 
 const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024; // 50 MB
 
 /** Cria campanha SUPHO de demonstração e um resultado para o dashboard mostrar o card. */
 async function ensureSuphoDemoCampaign(
-  admin: SupabaseClient,
+  admin: AdminDbClientType,
   orgId: string
 ): Promise<void> {
   const { data: existing } = await admin

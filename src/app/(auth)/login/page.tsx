@@ -4,7 +4,6 @@ import { Suspense, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowRight, CheckCircle2, ShieldCheck, TrendingUp, Undo2 } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
 import { Logo } from '@/components/ui/Logo';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,28 +25,27 @@ function LoginContent() {
     setError(null);
     setLoading(true);
     try {
-      const supabase = createClient();
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      if (signInError) throw signInError;
       const next = inviteToken
         ? `/invite/accept?token=${encodeURIComponent(inviteToken)}`
         : '/app/dashboard';
-      router.push(next);
-      router.refresh();
+      const formData = new FormData();
+      formData.set('email', email);
+      formData.set('password', password);
+      const res = await fetch(`/api/auth/login?next=${encodeURIComponent(next)}`, {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+      });
+      const data = (await res.json()) as { ok?: boolean; next?: string; error?: string };
+      if (data.ok && data.next) {
+        router.push(data.next);
+        router.refresh();
+        return;
+      }
+      setError(data.error ?? 'Erro ao fazer login');
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Erro ao fazer login';
-      const isConfig = msg.includes('Variável de ambiente ausente') || msg.includes('NEXT_PUBLIC_SUPABASE');
-      const isNetwork = msg.includes('fetch') || msg.includes('Failed to fetch') || msg.includes('Network') || msg.includes('ECONNREFUSED');
-      if (isConfig) {
-        setError('Supabase não configurado. Acesse /setup e siga as instruções (Supabase local ou Cloud). Reinicie o servidor após editar .env.local.');
-      } else if (isNetwork) {
-        setError('Não foi possível conectar ao Supabase. Se estiver em dev local: rode "npx supabase start", copie as variáveis de "npx supabase status" para .env.local e reinicie o servidor.');
-      } else {
-        setError(msg);
-      }
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -134,7 +132,7 @@ function LoginContent() {
                     role="alert"
                   >
                     <p>{error}</p>
-                    {(error.includes('Supabase') || error.includes('npx supabase')) && (
+                    {(error.includes('configuração') || error.includes('conectar')) && (
                       <Link href="/setup" className="inline-flex font-medium underline hover:no-underline">
                         Ver instruções de configuração →
                       </Link>

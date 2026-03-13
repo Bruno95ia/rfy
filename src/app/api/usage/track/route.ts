@@ -4,9 +4,8 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getOrgIdForUser, userHasOrgAccess } from '@/lib/auth';
+import { getOrgIdForUser, requireApiAuth, userHasOrgAccess } from '@/lib/auth';
 import { appendAuditLog } from '@/lib/billing';
 
 const bodySchema = z.object({
@@ -14,13 +13,9 @@ const bodySchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
-  }
+  const auth = await requireApiAuth();
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
 
   let body: unknown;
   try {

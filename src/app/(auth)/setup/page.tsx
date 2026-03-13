@@ -4,27 +4,26 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { Logo } from '@/components/ui/Logo';
 
-const ENV_CLOUD = `NEXT_PUBLIC_SUPABASE_URL=https://seu-projeto.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=seu-anon-key
-SUPABASE_SERVICE_ROLE_KEY=seu-service-role-key
-NEXT_PUBLIC_APP_URL=http://localhost:3000
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres
-AI_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres`;
+const ENV_EXAMPLE = `# PostgreSQL (obrigatório)
+DATABASE_URL=postgresql://usuario:senha@host:5432/nome_do_banco
 
-const ENV_LOCAL = `# Após rodar: npx supabase start && npx supabase status
-NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321
-NEXT_PUBLIC_SUPABASE_ANON_KEY=<copie do "anon key" do status>
-SUPABASE_SERVICE_ROLE_KEY=<copie do "service_role key" do status>
+# Opcional: mesmo banco para AI/relatórios
+AI_DATABASE_URL=postgresql://usuario:senha@host:5432/nome_do_banco
+
+# URL da aplicação (redirects e links)
 NEXT_PUBLIC_APP_URL=http://localhost:3000
-DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres
-AI_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres`;
+
+# Uploads: diretório no servidor para armazenar CSVs (opcional; sem isso, defina UPLOAD_DIR ou use storage externo)
+# UPLOAD_DIR=/var/app/uploads
+
+# Criptografia para secrets (api_key, webhook). Gere com: openssl rand -hex 32
+ENCRYPTION_KEY=`;
 
 export default function SetupPage() {
   const [copied, setCopied] = useState(false);
 
-  const [envMode, setEnvMode] = useState<'local' | 'cloud'>('local');
   const copyEnv = () => {
-    navigator.clipboard.writeText(envMode === 'local' ? ENV_LOCAL : ENV_CLOUD);
+    navigator.clipboard.writeText(ENV_EXAMPLE);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -38,10 +37,10 @@ export default function SetupPage() {
           <p className="mt-2 text-slate-500">Ative seu workspace em menos de 10 minutos</p>
           <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
             <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700">
-              Setup guiado
+              PostgreSQL
             </span>
             <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
-              Produção-ready
+              Sem Supabase
             </span>
           </div>
         </div>
@@ -55,93 +54,41 @@ export default function SetupPage() {
                 </svg>
               </div>
               <div className="flex-1">
-                <h2 className="text-xl font-semibold text-slate-900">Configuração do Supabase</h2>
+                <h2 className="text-xl font-semibold text-slate-900">Configuração do banco de dados</h2>
                 <p className="mt-2 leading-relaxed text-slate-600">
-                  Siga os passos abaixo para deixar o sistema funcional e pronto para escalar como SaaS.
+                  O sistema usa apenas PostgreSQL (ex.: RDS, EC2, Docker). Defina <code className="rounded bg-slate-100 px-1 py-0.5">DATABASE_URL</code> e aplique as migrations.
                 </p>
 
-                <div className="mt-4 flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setEnvMode('local')}
-                    className={`rounded-lg px-3 py-1.5 text-sm font-medium ${envMode === 'local' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
-                  >
-                    Supabase local (recomendado)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setEnvMode('cloud')}
-                    className={`rounded-lg px-3 py-1.5 text-sm font-medium ${envMode === 'cloud' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
-                  >
-                    Supabase Cloud
-                  </button>
-                </div>
-
-                {envMode === 'local' ? (
-                  <>
-                    <ol className="mt-6 space-y-4">
-                      <li className="flex gap-4">
-                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-sm font-bold text-indigo-600">1</span>
-                        <div>
-                          <span className="font-medium text-slate-900">No terminal:</span> <code className="rounded bg-slate-100 px-1.5 py-0.5 text-indigo-700 text-sm">npx supabase start</code>
-                        </div>
-                      </li>
-                      <li className="flex gap-4">
-                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-sm font-bold text-indigo-600">2</span>
-                        <div>
-                          <span className="font-medium text-slate-900">Rode</span> <code className="rounded bg-slate-100 px-1.5 py-0.5 text-indigo-700 text-sm">npx supabase status</code> e copie API URL, anon key e service_role key
-                        </div>
-                      </li>
-                      <li className="flex gap-4">
-                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-sm font-bold text-indigo-600">3</span>
-                        <div>
-                          <span className="font-medium text-slate-900">Crie ou edite</span> <code className="rounded bg-slate-100 px-1.5 py-0.5 text-indigo-700 text-sm">.env.local</code> com os valores abaixo (substitua as chaves pelas do status)
-                        </div>
-                      </li>
-                      <li className="flex gap-4">
-                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-sm font-bold text-indigo-600">4</span>
-                        <div>
-                          <span className="font-medium text-slate-900">Rode</span> <code className="rounded bg-slate-100 px-1.5 py-0.5 text-indigo-700 text-sm">npm run supabase:local</code> para aplicar migrations e criar usuário demo (admin@demo.rfy.local / Adminrv)
-                        </div>
-                      </li>
-                    </ol>
-                    <p className="mt-2 text-sm text-slate-500">Reinicie o servidor (<code className="rounded bg-slate-100 px-1 py-0.5">npm run dev</code>) após alterar o .env.local.</p>
-                  </>
-                ) : (
-                  <>
-                    <ol className="mt-6 space-y-4">
-                      <li className="flex gap-4">
-                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-sm font-bold text-indigo-600">1</span>
-                        <div>
-                          <span className="font-medium text-slate-900">Crie um projeto</span> em{' '}
-                          <a href="https://supabase.com" target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">supabase.com</a>
-                        </div>
-                      </li>
-                      <li className="flex gap-4">
-                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-sm font-bold text-indigo-600">2</span>
-                        <div>
-                          <span className="font-medium text-slate-900">Execute o schema</span> <code className="rounded bg-slate-100 px-1.5 py-0.5 text-indigo-700 text-sm">supabase/sql/schema.sql</code> no SQL Editor
-                        </div>
-                      </li>
-                      <li className="flex gap-4">
-                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-sm font-bold text-indigo-600">3</span>
-                        <div>
-                          <span className="font-medium text-slate-900">Crie o bucket</span> <code className="rounded bg-slate-100 px-1.5 py-0.5 text-indigo-700 text-sm">uploads</code> em Storage
-                        </div>
-                      </li>
-                      <li className="flex gap-4">
-                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-sm font-bold text-indigo-600">4</span>
-                        <div>
-                          <span className="font-medium text-slate-900">Crie</span> <code className="rounded bg-slate-100 px-1.5 py-0.5 text-indigo-700 text-sm">.env.local</code> com as variáveis do projeto
-                        </div>
-                      </li>
-                    </ol>
-                  </>
-                )}
+                <ol className="mt-6 space-y-4">
+                  <li className="flex gap-4">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-sm font-bold text-indigo-600">1</span>
+                    <div>
+                      <span className="font-medium text-slate-900">Crie ou edite</span> <code className="rounded bg-slate-100 px-1.5 py-0.5 text-indigo-700 text-sm">.env.local</code> com as variáveis abaixo.
+                    </div>
+                  </li>
+                  <li className="flex gap-4">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-sm font-bold text-indigo-600">2</span>
+                    <div>
+                      <span className="font-medium text-slate-900">Aplique as migrations</span> no PostgreSQL (<code className="rounded bg-slate-100 px-1 py-0.5">npm run db:migrate</code> ou execute os SQL em <code className="rounded bg-slate-100 px-1 py-0.5">supabase/sql/</code>).
+                    </div>
+                  </li>
+                  <li className="flex gap-4">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-sm font-bold text-indigo-600">3</span>
+                    <div>
+                      <span className="font-medium text-slate-900">Opcional:</span> defina <code className="rounded bg-slate-100 px-1 py-0.5">UPLOAD_DIR</code> para salvar CSVs em disco (ex.: <code className="rounded bg-slate-100 px-1 py-0.5">/var/app/uploads</code>).
+                    </div>
+                  </li>
+                  <li className="flex gap-4">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-sm font-bold text-indigo-600">4</span>
+                    <div>
+                      <span className="font-medium text-slate-900">Reinicie o servidor</span> (<code className="rounded bg-slate-100 px-1 py-0.5">npm run dev</code> ou <code className="rounded bg-slate-100 px-1 py-0.5">npm run start</code>) após alterar o .env.
+                    </div>
+                  </li>
+                </ol>
 
                 <div className="relative mt-6">
                   <pre className="overflow-x-auto rounded-xl bg-slate-100 p-5 text-sm leading-relaxed text-slate-700 whitespace-pre-wrap">
-                    {envMode === 'local' ? ENV_LOCAL : ENV_CLOUD}
+                    {ENV_EXAMPLE}
                   </pre>
                   <button
                     onClick={copyEnv}
@@ -156,20 +103,20 @@ export default function SetupPage() {
 
           <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
             <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-              Checklist final de ativação
+              Checklist final
             </h3>
             <div className="mt-4 grid gap-2 text-sm text-slate-600 sm:grid-cols-2">
               <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                1. Variáveis `.env.local` configuradas
+                1. <code className="text-indigo-700">DATABASE_URL</code> configurado
               </p>
               <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                2. Schema e migrations aplicados
+                2. Migrations aplicadas no PostgreSQL
               </p>
               <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                3. Bucket `uploads` criado
+                3. (Opcional) <code className="text-indigo-700">UPLOAD_DIR</code> para uploads
               </p>
               <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                4. Login criado para o primeiro admin
+                4. Criar conta em /signup ou usar seed demo
               </p>
             </div>
           </div>

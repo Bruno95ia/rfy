@@ -1,17 +1,10 @@
-import { createBrowserClient } from '@supabase/ssr';
-
-function getEnv(name: string): string {
-  const value = process.env[name];
-  if (value == null || value === '') {
-    throw new Error(
-      `Variável de ambiente ausente: ${name}. Configure em .env.local (veja .env.example).`
-    );
-  }
-  return value;
-}
-
-export function createClient() {
-  const supabaseUrl = getEnv('NEXT_PUBLIC_SUPABASE_URL');
-  const supabaseAnonKey = getEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY');
-  return createBrowserClient(supabaseUrl, supabaseAnonKey);
+/**
+ * Cliente browser: auth é feita via API (/api/auth/login, signup) e sessão em cookie.
+ * Este módulo existe apenas para compatibilidade; não use createClient() no client para auth.
+ * Para checar usuário no servidor, use getCurrentUser() de @/lib/auth-session.
+ */
+export function createClient(): never {
+  throw new Error(
+    'Auth no browser é feita via /api/auth/login e /api/auth/signup. Use fetch com credentials: "include".'
+  );
 }

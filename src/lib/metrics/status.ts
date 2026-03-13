@@ -1,4 +1,4 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { AdminDbClientType } from '@/lib/supabase/admin';
 
 export type MetricsStatus = {
   org_id: string;
@@ -14,7 +14,7 @@ export function nextMetricsVersion(currentVersion: number | null | undefined): n
 }
 
 export async function touchMetricsStatus(
-  admin: SupabaseClient,
+  admin: AdminDbClientType,
   orgId: string,
   nowIso?: string
 ): Promise<MetricsStatus> {
@@ -50,7 +50,7 @@ export async function touchMetricsStatus(
 }
 
 export async function getMetricsStatus(
-  admin: SupabaseClient,
+  admin: AdminDbClientType,
   orgId: string
 ): Promise<MetricsStatus> {
   const { data: status } = await admin

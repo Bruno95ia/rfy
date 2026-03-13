@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getOrgIdForUser, getOrgMemberRole, userHasOrgAccess } from '@/lib/auth';
+import { getOrgMemberRole, requireApiUserOrgAccess } from '@/lib/auth';
 import { appendAuditLog } from '@/lib/billing';
 
 const deleteBodySchema = z.object({
@@ -11,22 +10,9 @@ const deleteBodySchema = z.object({
 
 /** GET: lista membros da organização (user_id, role). Email não exposto por padrão. */
 export async function GET(req: NextRequest) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
-  }
-
-  const orgId = req.nextUrl.searchParams.get('org_id')?.trim() || (await getOrgIdForUser(user.id));
-  if (!orgId) {
-    return NextResponse.json({ error: 'Organização não encontrada' }, { status: 404 });
-  }
-  const hasAccess = await userHasOrgAccess(user.id, orgId);
-  if (!hasAccess) {
-    return NextResponse.json({ error: 'Sem permissão' }, { status: 403 });
-  }
+  const auth = await requireApiUserOrgAccess(req.nextUrl.searchParams.get('org_id'));
+  if (!auth.ok) return auth.response;
+  const { user, orgId } = auth;
 
   const admin = createAdminClient();
   const { data: rows, error } = await admin
@@ -48,22 +34,9 @@ export async function GET(req: NextRequest) {
 
 /** DELETE: remove membro da organização (apenas owner/admin; não pode remover a si mesmo se for o único owner) */
 export async function DELETE(req: NextRequest) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
-  }
-
-  const orgId = req.nextUrl.searchParams.get('org_id')?.trim() || (await getOrgIdForUser(user.id));
-  if (!orgId) {
-    return NextResponse.json({ error: 'Organização não encontrada' }, { status: 404 });
-  }
-  const hasAccess = await userHasOrgAccess(user.id, orgId);
-  if (!hasAccess) {
-    return NextResponse.json({ error: 'Sem permissão' }, { status: 403 });
-  }
+  const auth = await requireApiUserOrgAccess(req.nextUrl.searchParams.get('org_id'));
+  if (!auth.ok) return auth.response;
+  const { user, orgId } = auth;
   const role = await getOrgMemberRole(user.id, orgId);
   if (!role || (role !== 'owner' && role !== 'admin')) {
     return NextResponse.json({ error: 'Apenas owner ou admin podem remover membros' }, { status: 403 });

@@ -12,10 +12,7 @@ export default async function DashboardPage() {
   const { user } = await requireAuth();
   const supabase = await createClient();
 
-  let orgId = (await supabase.from('org_members').select('org_id').limit(1)).data?.[0]?.org_id;
-  if (!orgId) {
-    orgId = await getOrgIdForUser(user.id);
-  }
+  const orgId = await getOrgIdForUser(user.id);
   if (!orgId) {
     return (
       <div className="flex items-center justify-center py-24 text-[var(--color-text-muted)]">
@@ -137,7 +134,7 @@ export default async function DashboardPage() {
       <DashboardClient
         orgId={orgId}
         userRole={role ?? 'viewer'}
-        report={report}
+        report={report as DashboardClientProps['report']}
         snapshot={report?.snapshot_json as Record<string, unknown> | null}
         frictions={report?.frictions_json as Array<Record<string, unknown>> | null}
         pillarScores={report?.pillar_scores_json as Record<string, unknown> | null}

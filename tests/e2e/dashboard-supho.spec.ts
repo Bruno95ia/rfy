@@ -6,11 +6,13 @@ import { test, expect } from '@playwright/test';
  */
 test.describe('Fluxo login → dashboard → SUPHO', () => {
   test('login com demo, dashboard carrega e SUPHO está acessível', async ({ page }) => {
-    await page.goto('/login');
+    const email = `dashboard-supho-${Date.now()}@example.com`;
+    const password = 'Test123456!';
 
-    await expect(page.getByRole('button', { name: /admin@demo\.rfy\.local/ })).toBeVisible();
-    await page.getByRole('button', { name: /admin@demo\.rfy\.local/ }).click();
-    await page.getByRole('button', { name: 'Entrar' }).click();
+    await page.goto('/signup');
+    await page.getByLabel('Email').fill(email);
+    await page.getByLabel('Senha').fill(password);
+    await page.getByRole('button', { name: 'Criar conta' }).click();
 
     await expect(page).toHaveURL(/\/app\/dashboard/);
     await page.waitForLoadState('networkidle');

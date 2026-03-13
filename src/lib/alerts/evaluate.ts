@@ -1,4 +1,4 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { AdminDbClientType } from '@/lib/supabase/admin';
 
 const AI_BASE = process.env.AI_SERVICE_URL ?? 'http://localhost:8001';
 const AI_FETCH_TIMEOUT_MS = 20000;
@@ -42,7 +42,7 @@ function normalizeRuleType(ruleKey: string): CanonicalRuleType | null {
 }
 
 async function getMetricsForOrg(
-  admin: SupabaseClient,
+  admin: AdminDbClientType,
   orgId: string
 ): Promise<MetricsContext> {
   const { data: report } = await admin
@@ -164,7 +164,7 @@ function buildAlertTitle(tipo: CanonicalRuleType): string {
 }
 
 export async function evaluateAlertsForOrg(
-  admin: SupabaseClient,
+  admin: AdminDbClientType,
   orgId: string
 ): Promise<EvaluateAlertsResult> {
   const metrics = await getMetricsForOrg(admin, orgId);

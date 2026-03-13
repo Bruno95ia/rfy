@@ -1,4 +1,4 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { AdminDbClientType } from '@/lib/supabase/admin';
 import { inngest } from '@/inngest/client';
 import { computeAndPersistReport } from '@/lib/report-compute-persist';
 import { evaluateAlertsForOrg } from '@/lib/alerts/evaluate';
@@ -8,7 +8,7 @@ export type RecomputeDispatchResult = {
 };
 
 export async function dispatchReportRecompute(
-  admin: SupabaseClient,
+  admin: AdminDbClientType,
   orgId: string
 ): Promise<RecomputeDispatchResult> {
   try {

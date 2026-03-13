@@ -1,7 +1,6 @@
 import { z } from 'zod';
-import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { userHasOrgAccess } from '@/lib/auth';
+import { requireApiAuth, requireApiUserOrgAccess } from '@/lib/auth';
 import { checkRateLimit } from '@/lib/ratelimit';
 import { checkOrgLimit, recordUsageEvent, appendAuditLog } from '@/lib/billing';
 import { inngest } from '@/inngest/client';
@@ -21,13 +20,9 @@ const uploadFormSchema = z.object({
 });
 
 export async function POST(request: Request) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
-  }
+  const auth = await requireApiAuth();
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
 
   const identifier = `upload:${user.id}`;
   const { limited } = await checkRateLimit(identifier);
@@ -73,20 +68,8 @@ export async function POST(request: Request) {
     );
   }
 
-  const { data: members } = await supabase
-    .from('org_members')
-    .select('org_id')
-    .eq('user_id', user.id)
-    .eq('org_id', orgIdVal)
-    .limit(1);
-
-  let hasAccess = (members?.length ?? 0) > 0;
-  if (!hasAccess) {
-    hasAccess = await userHasOrgAccess(user.id, orgIdVal);
-  }
-  if (!hasAccess) {
-    return NextResponse.json({ error: 'Sem permissão' }, { status: 403 });
-  }
+  const access = await requireApiUserOrgAccess(orgIdVal);
+  if (!access.ok) return access.response;
 
   const admin = createAdminClient();
   const uploadsLimit = await checkOrgLimit(admin, orgIdVal, 'uploads_30d', 1);

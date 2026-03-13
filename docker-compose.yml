@@ -1,21 +1,27 @@
-# Revenue Engine - Cloud Privada (IA + Benchmark + MLflow)
-# Compatível com Linux/Mac
-# Uso: docker compose up --build
+# Revenue Engine - stack local (App + AI + Postgres + Redis + MLflow)
+# Compatível com Compose v2+
 
 services:
   app:
     build:
       context: .
       dockerfile: Dockerfile
-    env_file:
-      - .env.local
     ports:
       - "3000:3000"
     environment:
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
       AI_SERVICE_URL: http://ai-service:8001
-      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/postgres}
+      DATABASE_URL: ${COMPOSE_DATABASE_URL:-postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/postgres}
+      AI_DATABASE_URL: ${COMPOSE_AI_DATABASE_URL:-postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/postgres}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-rfy-local-dev-encryption-key-change-me}
+      UPLOAD_DIR: /data/uploads
+    volumes:
+      - app-uploads:/data/uploads
     depends_on:
-      - ai-service
+      ai-service:
+        condition: service_started
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
 
   ai-service:
@@ -25,9 +31,11 @@ services:
     ports:
       - "8001:8001"
     environment:
-      AI_DATABASE_URL: ${AI_DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/postgres}
+      AI_DATABASE_URL: ${COMPOSE_AI_DATABASE_URL:-postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/postgres}
       AI_ARTIFACTS_PATH: /artifacts
       AI_K_ANONYMITY: 5
+      AI_CORS_ORIGINS: ${AI_CORS_ORIGINS:-*}
+      AI_DEBUG: ${AI_DEBUG:-true}
       MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI:-http://mlflow:5000}
     volumes:
       - ai-artifacts:/artifacts
@@ -81,3 +89,4 @@ volumes:
   postgres_data:
   ai-artifacts:
   mlflow-artifacts:
+  app-uploads:

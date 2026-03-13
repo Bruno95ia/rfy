@@ -8,9 +8,11 @@ import { appendAuditLog } from '@/lib/billing';
 import { sendInviteEmail } from '@/lib/email/send';
 
 const INVITE_EXPIRES_DAYS = 7;
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? process.env.VERCEL_URL
-  ? `https://${process.env.VERCEL_URL}`
-  : 'http://localhost:3000';
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL
+  ? process.env.NEXT_PUBLIC_APP_URL
+  : process.env.VERCEL_URL
+    ? `https://${process.env.VERCEL_URL}`
+    : 'http://localhost:3000';
 
 async function resolveOrgAndRequireManage(
   userId: string,
@@ -138,7 +140,7 @@ export async function POST(req: NextRequest) {
 
   const { data: org } = await admin.from('orgs').select('name').eq('id', check.orgId).single();
   const orgName = org?.name ?? 'Organização';
-  const inviterName = user.email ?? user.user_metadata?.name ?? 'Alguém';
+  const inviterName = user.email ?? (user as { user_metadata?: { name?: string } }).user_metadata?.name ?? 'Alguém';
   const acceptUrl = `${APP_URL}/invite/accept?token=${token}`;
 
   const sendResult = await sendInviteEmail(email, orgName, inviterName, acceptUrl);

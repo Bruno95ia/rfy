@@ -95,55 +95,34 @@ Se não existir `.env.local`:
 cp .env.example .env.local
 ```
 
-O `.env.example` já deixa **Postgres no Docker local** como padrão (`DATABASE_URL` e `AI_DATABASE_URL` em `localhost:5432`). O **login** usa Supabase Auth: você precisa de URL e chaves do Supabase.
+O `.env.example` já deixa **Postgres no Docker local** como padrão (`DATABASE_URL` e `AI_DATABASE_URL` em `localhost:5432`), define um `UPLOAD_DIR` local e um `ENCRYPTION_KEY` de desenvolvimento. O fluxo padrão de **login/signup não depende mais de Supabase**.
 
-#### Opção A – Dev 100% local (Auth + Postgres sem Supabase Cloud)
+Mínimo para rodar localmente:
 
-Para não depender do Supabase em nuvem (projeto pausado, rede, etc.), use o **Supabase local** (Auth + Postgres em Docker):
-
-1. Inicie o Supabase local:
-   ```bash
-   npx supabase start
-   ```
-2. Copie as variáveis que o comando exibe (ou rode `npx supabase status`) e preencha no `.env.local`:
-   - `NEXT_PUBLIC_SUPABASE_URL` → use a **API URL** (ex.: `http://127.0.0.1:54321`)
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` → **anon key**
-   - `SUPABASE_SERVICE_ROLE_KEY` → **service_role key**
-   - `DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres`
-   - `AI_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres`
-3. Aplique migrations e crie o usuário demo:
-   ```bash
-   npm run supabase:local
-   ```
-4. Rode o app (`npm run dev`) e faça login com **admin@demo.rfy.local** / **Adminrv**.
-
-Supabase Studio local: http://127.0.0.1:54323
-
-**Se o login não funciona:** rode na raiz do projeto (com Docker rodando):
-
-```bash
-npm run supabase:local
-```
-
-O script sobe o Supabase local, aplica as migrations e mostra as linhas para colar no `.env.local`. Copie essas linhas para o `.env.local`, **reinicie o servidor** (`Ctrl+C` e `npm run dev` de novo) e tente logar com **admin@demo.rfy.local** / **Adminrv**.
-
-#### Opção B – Postgres no Docker + Supabase Cloud (Auth)
-
-Se você usa **apenas** o Postgres do `docker-compose` (porta 5432), o login continua indo para o **Supabase em nuvem**. Preencha no `.env.local`:
-
-- `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_ANON_KEY` (do projeto em supabase.com)
-- `SUPABASE_SERVICE_ROLE_KEY`
-- `DATABASE_URL` e `AI_DATABASE_URL` podem apontar para `localhost:5432` (Postgres do Docker).
-
-Mínimo para dev com Postgres no Docker + Supabase Cloud:
-
-```
+```env
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres
 AI_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres
-AI_SERVICE_URL=http://localhost:8001
 NEXT_PUBLIC_APP_URL=http://localhost:3000
-# + variáveis Supabase (Auth) do projeto em supabase.com
+AI_SERVICE_URL=http://localhost:8001
+UPLOAD_DIR=.uploads
+ENCRYPTION_KEY=<uma-string-com-16+-chars>
 ```
+
+Se quiser usar storage local para uploads no Docker, o `docker-compose.yml` já monta `UPLOAD_DIR=/data/uploads`.
+
+#### Supabase local/cloud (opcional)
+
+Supabase deixou de ser obrigatório para o auth principal. Hoje ele só é útil para fluxos legados ou integrações externas específicas.
+
+Se você ainda quiser usar Supabase local:
+
+```bash
+npx supabase start
+```
+
+O `supabase/config.toml` foi ajustado para desenvolvimento local (`localhost:3000`) e sem seed inexistente. Mesmo assim, o schema principal continua sendo aplicado pelos scripts em `supabase/sql/`.
+
+Se optar por Supabase Cloud, trate `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY` como variáveis opcionais.
 
 ### 5. Rodar aplicação
 
@@ -171,17 +150,14 @@ O Inngest Dev Server roda em `http://localhost:8288` e descobre automaticamente 
 
 #### Conta Admin e base de demonstração (tudo funcional)
 
-Para ter login pronto e base demo completa (relatórios, SUPHO, cenários, etc.):
+Para ter base demo completa (relatórios, SUPHO, cenários, etc.):
 
 1. **Execute as migrations antes** (Postgres no Docker ou Supabase): `npm run db:up` ou `npm run db:migrate`.
-2. Configure `.env.local` com `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` e `DATABASE_URL` (ou `AI_DATABASE_URL`).
-3. Execute **uma vez**:
-   ```bash
-   npm run db:seed:admin
-   ```
-   Isso cria o usuário **admin@demo.rfy.local** (senha **Adminrv**), a organização "Admin Demo" e aplica o seed completo.
-4. Acesse `/login`, use a dica "Demo" (ou preencha email e senha acima) e entre.
-5. Para **zerar e recarregar** a base de demonstração: em **Configurações**, use o botão **"Zerar e recarregar base de demonstração"**.
+2. Faça signup/login normalmente na aplicação.
+3. Use uploads de demonstração ou rode o seed com `DEMO_USER_ID=<uuid-do-app_users> npm run db:seed`.
+4. Para **zerar e recarregar** a base de demonstração: em **Configurações**, use o botão **"Zerar e recarregar base de demonstração"**.
+
+`npm run db:seed:admin` continua existindo apenas para cenários legados que ainda dependem de Supabase Admin API.
 
 ### 7. Migrations sem psql nem Docker (só Supabase)
 
@@ -210,7 +186,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon-key>
 SUPABASE_SERVICE_ROLE_KEY=<service-role-key>
 ```
 
-Se usar upload via Supabase Storage, mantenha o bucket `uploads` criado.
+Se usar upload via Supabase Storage, mantenha o bucket `uploads` criado. Caso contrário, defina `UPLOAD_DIR` para o fallback local em disco.
 
 ## SaaS Core implementado
 
@@ -245,14 +221,13 @@ docker compose up --build -d
 
 ### 2. Variáveis de ambiente
 
-Crie `.env.local` na raiz (ou use env no `docker-compose.yml`). O app em Docker recebe:
+Use `.env` ou exporte as variáveis antes de subir o Compose. O app em Docker recebe:
 
 - `AI_SERVICE_URL=http://ai-service:8001` (já definido no compose)
-- `DATABASE_URL` — para o Postgres do compose use `postgresql://postgres:postgres@postgres:5432/postgres`
-- Para **Auth** (login/signup), configure Supabase no `.env.local`:
-  - `NEXT_PUBLIC_SUPABASE_URL`
-  - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-  - `SUPABASE_SERVICE_ROLE_KEY`
+- `COMPOSE_DATABASE_URL` e `COMPOSE_AI_DATABASE_URL` são opcionais; se ausentes, a stack usa o Postgres interno em `postgres:5432`
+- `UPLOAD_DIR=/data/uploads` já vem configurado no compose com volume persistente
+- `ENCRYPTION_KEY` deve ser sobrescrita fora de dev
+- Variáveis Supabase são opcionais
 
 ### 3. Migrations com Docker
 

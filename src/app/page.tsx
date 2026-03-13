@@ -1,16 +1,8 @@
 import { redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
+import { getCurrentUser } from '@/lib/auth-session';
 
 export default async function Home() {
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
-    redirect('/setup');
-  }
-  try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) redirect('/app/dashboard');
-  } catch {
-    // Supabase indisponível ou erro de auth: envia para login
-  }
+  const user = await getCurrentUser();
+  if (user) redirect('/app/dashboard');
   redirect('/login');
 }

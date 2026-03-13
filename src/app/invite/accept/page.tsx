@@ -3,7 +3,6 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
 import { Logo } from '@/components/ui/Logo';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -23,38 +22,30 @@ function InviteAcceptContent() {
     }
 
     const run = async () => {
-      const supabase = createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      // Verifica se está logado via cookie (a API de accept exige auth)
+      const checkRes = await fetch('/api/org/invites/accept', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token }),
+        credentials: 'include',
+      });
+      const data = (await checkRes.json().catch(() => ({}))) as { ok?: boolean; error?: string };
 
-      if (!user) {
+      if (checkRes.status === 401) {
         const inviteParam = encodeURIComponent(token);
         router.replace(`/login?invite=${inviteParam}`);
         return;
       }
 
-      try {
-        const res = await fetch('/api/org/invites/accept', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token }),
-        });
-        const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
-
-        if (res.ok && data.ok) {
-          setStatus('success');
-          setMessage('Você entrou na organização com sucesso.');
-          router.refresh();
-          setTimeout(() => router.replace('/app/dashboard'), 1500);
-          return;
-        }
-        setStatus('error');
-        setMessage(data.error ?? 'Não foi possível aceitar o convite.');
-      } catch {
-        setStatus('error');
-        setMessage('Erro de conexão. Tente novamente.');
+      if (checkRes.ok && data.ok) {
+        setStatus('success');
+        setMessage('Você entrou na organização com sucesso.');
+        router.refresh();
+        setTimeout(() => router.replace('/app/dashboard'), 1500);
+        return;
       }
+      setStatus('error');
+      setMessage(data.error ?? 'Não foi possível aceitar o convite.');
     };
 
     void run();

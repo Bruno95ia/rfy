@@ -2,7 +2,7 @@
  * Calcula e persiste relatório (reports + org_unit_economics).
  * Usado pelo job Inngest e pelo fallback síncrono quando Inngest não está disponível.
  */
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { AdminDbClientType } from '@/lib/supabase/admin';
 import {
   computeSnapshot,
   computeFrictions,
@@ -15,7 +15,7 @@ import { computeUnitEconomics } from '@/lib/metrics/unit-economics';
 import { touchMetricsStatus } from '@/lib/metrics/status';
 
 export async function computeAndPersistReport(
-  admin: SupabaseClient,
+  admin: AdminDbClientType,
   orgId: string,
   uploadId?: string | null
 ): Promise<void> {
@@ -142,9 +142,11 @@ export async function computeAndPersistReport(
     .select('cac_manual, marketing_spend_monthly')
     .eq('org_id', orgId)
     .maybeSingle();
-  const won = (allOpps ?? []).filter((o) => o.status === 'won');
-  const lost = (allOpps ?? []).filter((o) => o.status === 'lost');
-  const open = (allOpps ?? []).filter((o) => o.status === 'open');
+  type OppRow = { value: number | null; company_name: string | null };
+  const all = (allOpps ?? []) as Array<{ status: string; value: number | null; company_name: string | null }>;
+  const won = all.filter((o) => o.status === 'won') as OppRow[];
+  const lost = all.filter((o) => o.status === 'lost') as OppRow[];
+  const open = all.filter((o) => o.status === 'open') as { value: number | null }[];
   const ue = computeUnitEconomics({
     won,
     lost,

@@ -9,8 +9,7 @@ export default async function PAIPPage() {
   const { user } = await requireAuth();
   const supabase = await createClient();
 
-  let orgId = (await supabase.from('org_members').select('org_id').limit(1)).data?.[0]?.org_id;
-  if (!orgId) orgId = await getOrgIdForUser(user.id);
+  const orgId = await getOrgIdForUser(user.id);
   if (!orgId) {
     return (
       <div className="flex items-center justify-center py-24 text-slate-500">
@@ -36,7 +35,7 @@ export default async function PAIPPage() {
         title="PAIP — Plano de Ação"
         subtitle="Plano 90–180 dias: gaps, objetivos, KRs e ações vinculados ao diagnóstico e ao CRM"
       />
-      <PAIPClient initialPlans={plans ?? []} />
+      <PAIPClient initialPlans={(plans ?? []) as { id: string; name: string; status: string; period_start: string; period_end: string; created_at: string }[]} />
     </div>
   );
 }

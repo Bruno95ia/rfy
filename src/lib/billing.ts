@@ -1,4 +1,4 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { AdminDbClientType } from '@/lib/supabase/admin';
 
 export type LimitMetric = 'uploads_30d' | 'seats' | 'active_deals';
 export type UsageMetric = LimitMetric | 'api_calls';
@@ -45,7 +45,7 @@ function mapLimitByMetric(
 }
 
 async function ensureSubscription(
-  admin: SupabaseClient,
+  admin: AdminDbClientType,
   orgId: string
 ): Promise<SubscriptionRow> {
   const { data: existing } = await admin
@@ -67,7 +67,7 @@ async function ensureSubscription(
   return fallback;
 }
 
-async function getPlan(admin: SupabaseClient, planId: string): Promise<PlanRow> {
+async function getPlan(admin: AdminDbClientType, planId: string): Promise<PlanRow> {
   const { data } = await admin
     .from('plans')
     .select('id, name, seats_limit, uploads_limit_30d, active_deals_limit')
@@ -84,7 +84,7 @@ async function getPlan(admin: SupabaseClient, planId: string): Promise<PlanRow> 
 }
 
 async function currentUsage(
-  admin: SupabaseClient,
+  admin: AdminDbClientType,
   orgId: string,
   metric: LimitMetric
 ): Promise<number> {
@@ -114,7 +114,7 @@ async function currentUsage(
 }
 
 export async function checkOrgLimit(
-  admin: SupabaseClient,
+  admin: AdminDbClientType,
   orgId: string,
   metric: LimitMetric,
   increment = 1
@@ -158,7 +158,7 @@ export async function checkOrgLimit(
 }
 
 export async function recordUsageEvent(
-  admin: SupabaseClient,
+  admin: AdminDbClientType,
   orgId: string,
   metric: UsageMetric,
   quantity = 1,
@@ -173,7 +173,7 @@ export async function recordUsageEvent(
 }
 
 export async function appendAuditLog(
-  admin: SupabaseClient,
+  admin: AdminDbClientType,
   payload: {
     orgId: string;
     actorUserId?: string | null;

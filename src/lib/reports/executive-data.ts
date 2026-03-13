@@ -2,7 +2,7 @@
  * Dados para relatório executivo (CSV/PDF).
  * Busca último report, forecast e alertas recentes.
  */
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { AdminDbClientType } from '@/lib/supabase/admin';
 import { computeRfySummary } from '@/lib/metrics/rfy-summary';
 
 const AI_BASE = process.env.AI_SERVICE_URL ?? 'http://localhost:8001';
@@ -21,7 +21,7 @@ export type ExecutiveData = {
 };
 
 export async function getExecutiveData(
-  admin: SupabaseClient,
+  admin: AdminDbClientType,
   orgId: string
 ): Promise<ExecutiveData> {
   const { data: report } = await admin

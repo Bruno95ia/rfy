@@ -2,12 +2,12 @@
  * Lógica compartilhada de processamento de upload (CSV → DB).
  * Usado pelos jobs Inngest e pelo fallback síncrono quando Inngest não está disponível.
  */
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { AdminDbClientType } from '@/lib/supabase/admin';
 import { parsePiperunCsv } from '@/lib/piperun/csv';
 import { normalizeOpportunityRow, normalizeActivityRow } from '@/lib/piperun/normalize';
 
 export async function processOpportunitiesCsv(
-  admin: SupabaseClient,
+  admin: AdminDbClientType,
   orgId: string,
   uploadId: string,
   csvBody: string
@@ -82,7 +82,7 @@ export async function processOpportunitiesCsv(
 }
 
 export async function processActivitiesCsv(
-  admin: SupabaseClient,
+  admin: AdminDbClientType,
   orgId: string,
   uploadId: string,
   csvBody: string
@@ -160,7 +160,7 @@ export async function processActivitiesCsv(
 
 /** Vincula atividades ao pipeline (company + title + pipeline) e retorna quantas foram vinculadas. */
 export async function linkActivitiesToOpportunities(
-  admin: SupabaseClient,
+  admin: AdminDbClientType,
   orgId: string,
   uploadId: string
 ): Promise<{ linked: number }> {

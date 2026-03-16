@@ -2,46 +2,21 @@ import { createHash, randomBytes } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getOrgIdForUser, requireApiAuth, userHasOrgAccess, type OrgRole } from '@/lib/auth';
+import {
+  requireApiUserOrgAccess,
+  getOrgMemberRole,
+  type OrgRole,
+} from '@/lib/auth';
 import { encrypt } from '@/lib/crypto';
 import { appendAuditLog } from '@/lib/billing';
 import { computeNextRunAt } from '@/lib/reports/next-run';
+import { appendFile } from 'node:fs/promises';
 
 type RoleGate = 'manage' | 'member';
 
-const ROLE_WEIGHT: Record<OrgRole, number> = {
-  owner: 4,
-  admin: 3,
-  manager: 2,
-  viewer: 1,
-};
-
 function hasRole(role: OrgRole, min: RoleGate): boolean {
-  if (min === 'member') return ROLE_WEIGHT[role] >= ROLE_WEIGHT.viewer;
-  return ROLE_WEIGHT[role] >= ROLE_WEIGHT.admin;
-}
-
-async function resolveOrgForUser(userId: string): Promise<string | null> {
-  return (await getOrgIdForUser(userId)) ?? null;
-}
-
-async function resolveUserRole(userId: string, orgId: string): Promise<OrgRole> {
-  const admin = createAdminClient();
-  try {
-    const { data } = await admin
-      .from('org_members')
-      .select('role')
-      .eq('user_id', userId)
-      .eq('org_id', orgId)
-      .maybeSingle();
-    const role = data?.role as OrgRole | undefined;
-    if (!role) return 'owner';
-    if (!Object.keys(ROLE_WEIGHT).includes(role)) return 'viewer';
-    return role;
-  } catch {
-    // Banco anterior à migração 006 ainda não possui coluna role.
-    return 'owner';
-  }
+  if (min === 'member') return true;
+  return role === 'owner' || role === 'admin';
 }
 
 function maskTarget(target: string): string {
@@ -63,24 +38,43 @@ function maskTarget(target: string): string {
 }
 
 export async function GET() {
-  const auth = await requireApiAuth();
+  const auth = await requireApiUserOrgAccess(null);
   if (!auth.ok) return auth.response;
-  const { user } = auth;
-
-  const orgId = await resolveOrgForUser(user.id);
-  if (!orgId) {
-    return NextResponse.json(
-      { error: 'Organização não encontrada' },
-      { status: 404 }
-    );
-  }
-
-  if (!(await userHasOrgAccess(user.id, orgId))) {
-    return NextResponse.json({ error: 'Sem permissão' }, { status: 403 });
-  }
+  const { user, orgId } = auth;
 
   const admin = createAdminClient();
-  const role = await resolveUserRole(user.id, orgId);
+  const role = (await getOrgMemberRole(user.id, orgId)) ?? 'viewer';
+
+  // #region agent log
+  fetch('http://localhost:7298/ingest/81cfdc9b-8f3a-42d7-bcbf-e3113764efc8', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Debug-Session-Id': '497d65',
+    },
+    body: JSON.stringify({
+      sessionId: '497d65',
+      runId: 'pre-fix',
+      hypothesisId: 'H3',
+      location: 'src/app/api/settings/route.ts:82-90',
+      message: 'GET /api/settings role resolvida',
+      data: { userId: user.id, orgId, role },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+  appendFile(
+    '/home/ubuntu/rfy/.cursor/debug-497d65.log',
+    JSON.stringify({
+      sessionId: '497d65',
+      runId: 'pre-fix',
+      hypothesisId: 'H3',
+      location: 'src/app/api/settings/route.ts:82-90',
+      message: 'GET /api/settings role resolvida',
+      data: { userId: user.id, orgId, role },
+      timestamp: Date.now(),
+    }) + '\n'
+  ).catch(() => {});
+  // #endregion
   const { data: org } = await admin
     .from('orgs')
     .select('name')
@@ -151,6 +145,12 @@ export async function GET() {
       is_active: boolean;
       recipients: string;
       next_run_at: string | null;
+      format: string;
+      timezone: string;
+      hour_utc: number;
+      minute_utc: number;
+      day_of_week: number | null;
+      day_of_month: number | null;
     }>,
     forecast_scenarios: [] as Array<{
       id: string;
@@ -294,7 +294,7 @@ export async function GET() {
         .order('created_at', { ascending: false }),
       admin
         .from('report_schedules')
-        .select('id, name, frequency, is_active, recipients, next_run_at')
+        .select('id, name, frequency, is_active, recipients, next_run_at, format, timezone, hour_utc, minute_utc, day_of_week, day_of_month')
         .eq('org_id', orgId)
         .order('created_at', { ascending: false }),
       admin
@@ -389,6 +389,21 @@ export async function GET() {
     // Compatibilidade com bases que ainda não aplicaram migração 006.
   }
 
+  // Sinaliza se o usuário atual é admin de plataforma (gestão global de usuários)
+  let isPlatformAdmin = false;
+  try {
+    const { data } = await admin
+      .from('app_users')
+      .select('id, is_platform_admin, is_active')
+      .eq('id', user.id)
+      .maybeSingle();
+    if (data && data.is_active !== false && data.is_platform_admin === true) {
+      isPlatformAdmin = true;
+    }
+  } catch {
+    // ignore, fallback permanece false
+  }
+
   return NextResponse.json({
     org: { id: orgId, name: org?.name ?? 'Minha organização' },
     role,
@@ -396,6 +411,7 @@ export async function GET() {
     integrations: integrations ?? [],
     usage,
     saas,
+    is_platform_admin: isPlatformAdmin,
     webhookBaseUrl: process.env.NEXT_PUBLIC_APP_URL
       ? `${process.env.NEXT_PUBLIC_APP_URL}/api/crm/piperun/webhook`
       : null,
@@ -403,23 +419,42 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const auth = await requireApiAuth();
+  const auth = await requireApiUserOrgAccess(null);
   if (!auth.ok) return auth.response;
-  const { user } = auth;
+  const { user, orgId } = auth;
 
-  const orgId = await resolveOrgForUser(user.id);
-  if (!orgId) {
-    return NextResponse.json(
-      { error: 'Organização não encontrada' },
-      { status: 404 }
-    );
-  }
+  const role = (await getOrgMemberRole(user.id, orgId)) ?? 'viewer';
 
-  if (!(await userHasOrgAccess(user.id, orgId))) {
-    return NextResponse.json({ error: 'Sem permissão' }, { status: 403 });
-  }
-
-  const role = await resolveUserRole(user.id, orgId);
+  // #region agent log
+  fetch('http://localhost:7298/ingest/81cfdc9b-8f3a-42d7-bcbf-e3113764efc8', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Debug-Session-Id': '497d65',
+    },
+    body: JSON.stringify({
+      sessionId: '497d65',
+      runId: 'pre-fix',
+      hypothesisId: 'H4',
+      location: 'src/app/api/settings/route.ts:421-429',
+      message: 'POST /api/settings role resolvida',
+      data: { userId: user.id, orgId, role },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+  appendFile(
+    '/home/ubuntu/rfy/.cursor/debug-497d65.log',
+    JSON.stringify({
+      sessionId: '497d65',
+      runId: 'pre-fix',
+      hypothesisId: 'H4',
+      location: 'src/app/api/settings/route.ts:421-429',
+      message: 'POST /api/settings role resolvida',
+      data: { userId: user.id, orgId, role },
+      timestamp: Date.now(),
+    }) + '\n'
+  ).catch(() => {});
+  // #endregion
   const bodySchema = z.object({
     section: z.string().min(1, 'section é obrigatória'),
     data: z.record(z.string(), z.unknown()).optional().default({}),
@@ -446,6 +481,8 @@ export async function POST(request: Request) {
     'alert_channel_create',
     'alert_rule_create',
     'report_schedule_create',
+    'report_schedule_update',
+    'report_schedule_delete',
     'forecast_scenario_save',
     'quarterly_goal_upsert',
     'retention_cohort_upsert',
@@ -831,6 +868,90 @@ export async function POST(request: Request) {
       action: 'report_schedule.created',
       entityType: 'report_schedules',
       metadata: { name, frequency },
+    });
+    return NextResponse.json({ ok: true });
+  }
+
+  if (section === 'report_schedule_update') {
+    const id = String(data.id ?? '').trim();
+    if (!id) {
+      return NextResponse.json({ error: 'id do agendamento é obrigatório' }, { status: 400 });
+    }
+    const name = String(data.name ?? '').trim();
+    const frequency = String(data.frequency ?? 'weekly');
+    const recipients = String(data.recipients ?? '').trim();
+    if (!name || !recipients) {
+      return NextResponse.json(
+        { error: 'name e recipients são obrigatórios' },
+        { status: 400 }
+      );
+    }
+    const tz = String(data.timezone ?? 'America/Sao_Paulo');
+    const hourUtc = data.hour_utc != null ? Number(data.hour_utc) : 12;
+    const minuteUtc = data.minute_utc != null ? Number(data.minute_utc) : 0;
+    const dayOfWeek = data.day_of_week != null ? Number(data.day_of_week) : null;
+    const dayOfMonth = data.day_of_month != null ? Number(data.day_of_month) : null;
+    const isActive = data.is_active !== false;
+    const format = String(data.format ?? 'link');
+    const nextRunAt = computeNextRunAt(
+      frequency as 'daily' | 'weekly' | 'monthly',
+      dayOfWeek,
+      dayOfMonth,
+      hourUtc,
+      minuteUtc,
+      tz
+    );
+    const { error: updateError } = await admin
+      .from('report_schedules')
+      .update({
+        name,
+        frequency,
+        day_of_week: dayOfWeek,
+        day_of_month: dayOfMonth,
+        hour_utc: hourUtc,
+        minute_utc: minuteUtc,
+        timezone: tz,
+        recipients,
+        format,
+        is_active: isActive,
+        next_run_at: nextRunAt,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .eq('org_id', orgId);
+    if (updateError) {
+      return NextResponse.json({ error: updateError.message }, { status: 500 });
+    }
+    await appendAuditLog(admin, {
+      orgId,
+      actorUserId: user.id,
+      action: 'report_schedule.updated',
+      entityType: 'report_schedules',
+      entityId: id,
+      metadata: { name, frequency },
+    });
+    return NextResponse.json({ ok: true });
+  }
+
+  if (section === 'report_schedule_delete') {
+    const id = String(data.id ?? '').trim();
+    if (!id) {
+      return NextResponse.json({ error: 'id do agendamento é obrigatório' }, { status: 400 });
+    }
+    const { error: deleteError } = await admin
+      .from('report_schedules')
+      .delete()
+      .eq('id', id)
+      .eq('org_id', orgId);
+    if (deleteError) {
+      return NextResponse.json({ error: deleteError.message }, { status: 500 });
+    }
+    await appendAuditLog(admin, {
+      orgId,
+      actorUserId: user.id,
+      action: 'report_schedule.deleted',
+      entityType: 'report_schedules',
+      entityId: id,
     });
     return NextResponse.json({ ok: true });
   }

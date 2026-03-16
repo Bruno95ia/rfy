@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
 
   const { data: campaign, error: campaignError } = await admin
     .from('supho_diagnostic_campaigns')
-    .select('id, org_id, name')
+    .select('id, org_id, name, question_ids')
     .eq('id', campaignId)
     .single();
 
@@ -80,7 +80,13 @@ export async function GET(req: NextRequest) {
     const byId = new Map<string, QuestionRow>();
     for (const row of (rNull.data ?? []) as QuestionRow[]) byId.set(row.id, row);
     for (const row of (rOrg.data ?? []) as QuestionRow[]) byId.set(row.id, row);
-    data = [...byId.values()].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+    let list = [...byId.values()].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+    const campaignQuestionIds = campaign.question_ids as string[] | null | undefined;
+    if (Array.isArray(campaignQuestionIds) && campaignQuestionIds.length > 0) {
+      const allowedSet = new Set(campaignQuestionIds);
+      list = list.filter((q) => allowedSet.has(q.id));
+    }
+    data = list;
   }
 
   if (error) {

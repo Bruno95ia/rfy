@@ -106,7 +106,23 @@ export default async function DashboardPage() {
                 download="relatorio-executivo.html"
               >
                 <Button size="sm">
-                  Baixar relatório executivo
+                  PDF
+                </Button>
+              </a>
+              <a
+                href={`/api/reports/executive.csv?org_id=${encodeURIComponent(orgId)}`}
+                download="relatorio-executivo.csv"
+              >
+                <Button variant="outline" size="sm">
+                  CSV
+                </Button>
+              </a>
+              <a
+                href={`/api/reports/executive.xlsx?org_id=${encodeURIComponent(orgId)}`}
+                download="relatorio-executivo.xlsx"
+              >
+                <Button variant="outline" size="sm">
+                  Excel
                 </Button>
               </a>
               <Link href="/app/reports">

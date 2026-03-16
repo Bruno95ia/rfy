@@ -4,6 +4,7 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { MaturidadePanelClient } from './MaturidadePanelClient';
+import { HistoricoDiagnosticoClient } from './HistoricoDiagnosticoClient';
 
 export default async function MaturidadePage() {
   const { user } = await requireAuth();
@@ -57,6 +58,7 @@ export default async function MaturidadePage() {
         subtitle="Visão integrada do último diagnóstico: radar dos pilares, nível de maturidade (ITSMO), gaps e leitura executiva."
       />
       <MaturidadePanelClient result={result} />
+      <HistoricoDiagnosticoClient />
     </div>
   );
 }

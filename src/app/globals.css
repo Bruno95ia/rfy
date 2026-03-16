@@ -86,6 +86,27 @@
   --radius: var(--radius-md);
 }
 
+/* Tema escuro (classe .dark no html) */
+.dark {
+  --rfy-color-background: #0f172a;
+  --rfy-color-surface: #1e293b;
+  --rfy-color-surface-muted: #334155;
+  --rfy-color-surface-elevated: #334155;
+  --rfy-color-text: #f1f5f9;
+  --rfy-color-text-muted: #94a3b8;
+  --rfy-color-border: #334155;
+  --rfy-color-border-strong: #475569;
+  --rfy-color-primary-soft: #312e81;
+  --rfy-color-success-soft: #064e3b;
+  --rfy-color-warning-soft: #78350f;
+  --rfy-color-danger-soft: #7f1d1d;
+  --rfy-color-overlay: rgba(0, 0, 0, 0.6);
+}
+
+.dark body {
+  background: var(--color-background);
+}
+
 @theme inline {
   --color-background: var(--rfy-color-background);
   --color-foreground: var(--rfy-color-text);

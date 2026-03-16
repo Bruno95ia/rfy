@@ -18,7 +18,7 @@ export default async function DiagnosticoPage() {
 
   const { data: campaigns } = await supabase
     .from('supho_diagnostic_campaigns')
-    .select('id, name, status, created_at')
+    .select('id, name, status, created_at, question_ids')
     .eq('org_id', orgId)
     .order('created_at', { ascending: false });
 
@@ -35,7 +35,7 @@ export default async function DiagnosticoPage() {
       />
       <DiagnosticoClient
         orgId={orgId}
-        initialCampaigns={(campaigns ?? []) as { id: string; name: string; status: string; created_at: string }[]}
+        initialCampaigns={(campaigns ?? []) as { id: string; name: string; status: string; created_at: string; question_ids?: string[] | null }[]}
       />
     </div>
   );

@@ -39,7 +39,7 @@ type InviteRow = {
   responded_at?: string | null;
 };
 
-type CampaignRow = { id: string; org_id: string; name: string };
+type CampaignRow = { id: string; org_id: string; name: string; question_ids?: string[] | null };
 type QuestionRow = {
   id: string;
   org_id: string | null;
@@ -371,5 +371,65 @@ describe('SUPHO forms', () => {
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.error).toContain('perguntas desconhecidas');
+  });
+
+  it('formulário com question_ids retorna apenas perguntas selecionadas e respond aceita só essas', async () => {
+    const state = baseState();
+    state.campaigns[0] = {
+      id: 'campaign-1',
+      org_id: 'org-1',
+      name: 'Diagnóstico Q1',
+      question_ids: ['q-global'],
+    };
+    state.invites.push({
+      id: 'invite-2',
+      email: 'outro@example.com',
+      name: 'Outro',
+      token: 'token-2',
+      form_slug: 'supho-campaign-1',
+      status: 'sent',
+    });
+    vi.mocked(createAdminClient).mockReturnValue(
+      createAdminStub(state) as unknown as ReturnType<typeof createAdminClient>
+    );
+
+    const infoRes = await getFormInfo(
+      new Request('http://localhost/api/forms/supho/info?token=token-2&slug=supho-campaign-1') as never
+    );
+    expect(infoRes.status).toBe(200);
+    const infoBody = await infoRes.json();
+    expect(infoBody.questions).toHaveLength(1);
+    expect(infoBody.questions[0].id).toBe('q-global');
+
+    const respondInvalid = await postFormResponse(
+      new Request('http://localhost/api/forms/supho/respond', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: 'token-2',
+          slug: 'supho-campaign-1',
+          answers: [
+            { question_id: 'q-global', value: 3 },
+            { question_id: 'q-org', value: 5 },
+          ],
+        }),
+      }) as never
+    );
+    expect(respondInvalid.status).toBe(400);
+    const invalidBody = await respondInvalid.json();
+    expect(invalidBody.error).toContain('não permitidas');
+
+    const respondRes = await postFormResponse(
+      new Request('http://localhost/api/forms/supho/respond', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: 'token-2',
+          slug: 'supho-campaign-1',
+          answers: [{ question_id: 'q-global', value: 4 }],
+        }),
+      }) as never
+    );
+    expect(respondRes.status).toBe(200);
   });
 });

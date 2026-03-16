@@ -63,6 +63,7 @@ type SettingsData = {
   org: { id: string; name: string };
   webhookBaseUrl?: string;
   role?: 'owner' | 'admin' | 'manager' | 'viewer';
+  is_platform_admin?: boolean;
   config: Config | null;
   usage?: {
     uploads_30d: number;
@@ -134,6 +135,12 @@ type SettingsData = {
       is_active: boolean;
       recipients: string;
       next_run_at: string | null;
+      format?: string;
+      timezone?: string;
+      hour_utc?: number;
+      minute_utc?: number;
+      day_of_week?: number | null;
+      day_of_month?: number | null;
     }>;
     forecast_scenarios: Array<{
       id: string;
@@ -223,6 +230,20 @@ export function SettingsClient() {
   const [newAlertRuleKey, setNewAlertRuleKey] = useState('rfy_abaixo_do_limiar');
   const [newAlertRuleThreshold, setNewAlertRuleThreshold] = useState('10');
   const [newScheduleRecipients, setNewScheduleRecipients] = useState('');
+  const [scheduleFormOpen, setScheduleFormOpen] = useState(false);
+  const [scheduleEditId, setScheduleEditId] = useState<string | null>(null);
+  const [scheduleForm, setScheduleForm] = useState({
+    name: 'Resumo Executivo',
+    frequency: 'weekly' as 'daily' | 'weekly' | 'monthly',
+    day_of_week: 1,
+    day_of_month: 1,
+    hour_utc: 12,
+    minute_utc: 0,
+    timezone: 'America/Sao_Paulo',
+    recipients: '',
+    format: 'link' as 'pdf' | 'csv' | 'link',
+    is_active: true,
+  });
   const [newScenarioName, setNewScenarioName] = useState('Cenário Base');
   const [newScenarioAssumptions, setNewScenarioAssumptions] = useState(
     '{"win_rate_delta":0,"cycle_days_delta":0}'
@@ -251,6 +272,40 @@ export function SettingsClient() {
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [revokeLoading, setRevokeLoading] = useState<string | null>(null);
   const [removeMemberLoading, setRemoveMemberLoading] = useState<string | null>(null);
+  const [people, setPeople] = useState<
+    Array<{
+      id: string;
+      full_name: string;
+      email: string | null;
+      phone: string | null;
+      company_name: string | null;
+      person_type: string;
+      department: string | null;
+      seniority: string | null;
+      role_title: string | null;
+      persona_tag: string | null;
+      is_key_contact: boolean;
+    }>
+  >([]);
+  const [peopleLoading, setPeopleLoading] = useState(false);
+  const [newPersonName, setNewPersonName] = useState('');
+  const [newPersonEmail, setNewPersonEmail] = useState('');
+  const [newPersonRoleTitle, setNewPersonRoleTitle] = useState('');
+  const [newPersonType, setNewPersonType] = useState<
+    'decision_maker' | 'economic_buyer' | 'champion' | 'user' | 'influencer' | 'stakeholder' | 'finance' | 'procurement' | 'other'
+  >('stakeholder');
+  const [newPersonDept, setNewPersonDept] = useState('');
+  const [newPersonSeniority, setNewPersonSeniority] = useState<
+    'c_level' | 'vp' | 'director' | 'manager' | 'analyst' | 'other'
+  >('other');
+  const [newPersonKey, setNewPersonKey] = useState(false);
+  const [newPersonPersonaTag, setNewPersonPersonaTag] = useState('');
+  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
+  const [platformUsers, setPlatformUsers] = useState<
+    Array<{ id: string; email: string; created_at: string; is_active: boolean; is_platform_admin: boolean }>
+  >([]);
+  const [platformUsersLoading, setPlatformUsersLoading] = useState(false);
+  const [platformUsersError, setPlatformUsersError] = useState<string | null>(null);
 
   const loadSettings = async () => {
     setLoading(true);
@@ -266,6 +321,7 @@ export function SettingsClient() {
         setConfig((c) => ({ ...c, ...d.config }));
       }
       setRole(d.role ?? 'owner');
+      setIsPlatformAdmin(Boolean(d.is_platform_admin));
       setIntegrationStatus(
         d.integrations?.find((i: SettingsData['integrations'][number]) => i.is_active) ?? null
       );
@@ -297,6 +353,57 @@ export function SettingsClient() {
         } catch {
           setMembers([]);
           setPendingInvites([]);
+        }
+        try {
+          setPeopleLoading(true);
+          const peopleRes = await fetch(`/api/org/people?org_id=${encodeURIComponent(oid)}`);
+          const peopleData = (await peopleRes.json()) as {
+            people?: Array<{
+              id: string;
+              full_name: string;
+              email: string | null;
+              phone: string | null;
+              company_name: string | null;
+              person_type: string;
+              department: string | null;
+              seniority: string | null;
+              role_title: string | null;
+              persona_tag: string | null;
+              is_key_contact: boolean;
+            }>;
+          };
+          setPeople(peopleData.people ?? []);
+        } catch {
+          setPeople([]);
+        } finally {
+          setPeopleLoading(false);
+        }
+      }
+
+      if (d.is_platform_admin) {
+        try {
+          setPlatformUsersLoading(true);
+          setPlatformUsersError(null);
+          const adminRes = await fetch('/api/admin/users');
+          const adminData = (await adminRes.json()) as {
+            users?: Array<{
+              id: string;
+              email: string;
+              created_at: string;
+              is_active: boolean;
+              is_platform_admin: boolean;
+            }>;
+            error?: string;
+          };
+          if (!adminRes.ok) {
+            throw new Error(adminData.error ?? 'Erro ao carregar usuários da plataforma');
+          }
+          setPlatformUsers(adminData.users ?? []);
+        } catch (e) {
+          setPlatformUsersError(e instanceof Error ? e.message : 'Erro ao carregar usuários da plataforma');
+          setPlatformUsers([]);
+        } finally {
+          setPlatformUsersLoading(false);
         }
       }
     } catch (e) {
@@ -1006,32 +1113,191 @@ export function SettingsClient() {
                 <FileClock className="h-4 w-4 text-indigo-600" />
                 Relatórios agendados
               </p>
-              <Input
-                value={newScheduleRecipients}
-                onChange={(e) => setNewScheduleRecipients(e.target.value)}
-                placeholder="emails separados por vírgula"
-              />
-              <Button
-                size="sm"
-                onClick={async () => {
-                  await save('report_schedule_create', {
-                    name: 'Resumo Executivo',
-                    frequency: 'weekly',
-                    day_of_week: 1,
-                    hour_utc: 12,
-                    minute_utc: 0,
-                    timezone: config.timezone ?? 'America/Sao_Paulo',
-                    recipients: newScheduleRecipients,
-                    format: 'link',
-                  });
-                  await loadSettings();
-                }}
-              >
-                Criar agendamento
-              </Button>
               <p className="text-xs text-slate-500">
                 Agendamentos ativos: {saas.report_schedules.filter((r) => r.is_active).length}
               </p>
+              <ul className="space-y-2">
+                {saas.report_schedules.map((r) => (
+                  <li
+                    key={r.id}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50/50 px-3 py-2 text-sm"
+                  >
+                    <span className="font-medium text-slate-800">{r.name}</span>
+                    <span className="text-slate-500">
+                      {r.frequency === 'daily' ? 'Diário' : r.frequency === 'weekly' ? 'Semanal' : 'Mensal'}
+                      {r.next_run_at && ` · Próximo: ${new Date(r.next_run_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}`}
+                    </span>
+                    <div className="flex gap-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 text-slate-600"
+                        onClick={() => {
+                          setScheduleEditId(r.id);
+                          setScheduleForm({
+                            name: r.name,
+                            frequency: (r.frequency || 'weekly') as 'daily' | 'weekly' | 'monthly',
+                            day_of_week: r.day_of_week ?? 1,
+                            day_of_month: r.day_of_month ?? 1,
+                            hour_utc: r.hour_utc ?? 12,
+                            minute_utc: r.minute_utc ?? 0,
+                            timezone: r.timezone ?? config.timezone ?? 'America/Sao_Paulo',
+                            recipients: r.recipients ?? '',
+                            format: (r.format || 'link') as 'pdf' | 'csv' | 'link',
+                            is_active: r.is_active ?? true,
+                          });
+                          setScheduleFormOpen(true);
+                        }}
+                      >
+                        Editar
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 text-red-600 hover:text-red-700"
+                        onClick={async () => {
+                          if (!confirm('Excluir este agendamento?')) return;
+                          await save('report_schedule_delete', { id: r.id });
+                          await loadSettings();
+                        }}
+                      >
+                        Excluir
+                      </Button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              {!scheduleFormOpen ? (
+                <Button size="sm" onClick={() => { setScheduleEditId(null); setScheduleForm({ ...scheduleForm, recipients: newScheduleRecipients || '' }); setScheduleFormOpen(true); }}>
+                  Novo agendamento
+                </Button>
+              ) : (
+                <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-4">
+                  <p className="text-sm font-medium text-slate-700">
+                    {scheduleEditId ? 'Editar agendamento' : 'Novo agendamento'}
+                  </p>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <Input
+                      placeholder="Nome (ex.: Resumo Executivo)"
+                      value={scheduleForm.name}
+                      onChange={(e) => setScheduleForm((f) => ({ ...f, name: e.target.value }))}
+                    />
+                    <select
+                      className="flex h-10 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm"
+                      value={scheduleForm.frequency}
+                      onChange={(e) => setScheduleForm((f) => ({ ...f, frequency: e.target.value as 'daily' | 'weekly' | 'monthly' }))}
+                    >
+                      <option value="daily">Diário</option>
+                      <option value="weekly">Semanal</option>
+                      <option value="monthly">Mensal</option>
+                    </select>
+                    {scheduleForm.frequency === 'weekly' && (
+                      <div className="sm:col-span-2">
+                        <label className="mb-1 block text-xs text-slate-500">Dia da semana (0=dom, 1=seg, …)</label>
+                        <Input
+                          type="number"
+                          min={0}
+                          max={6}
+                          value={scheduleForm.day_of_week}
+                          onChange={(e) => setScheduleForm((f) => ({ ...f, day_of_week: parseInt(e.target.value, 10) || 0 }))}
+                        />
+                      </div>
+                    )}
+                    {scheduleForm.frequency === 'monthly' && (
+                      <div className="sm:col-span-2">
+                        <label className="mb-1 block text-xs text-slate-500">Dia do mês (1–28)</label>
+                        <Input
+                          type="number"
+                          min={1}
+                          max={28}
+                          value={scheduleForm.day_of_month}
+                          onChange={(e) => setScheduleForm((f) => ({ ...f, day_of_month: parseInt(e.target.value, 10) || 1 }))}
+                        />
+                      </div>
+                    )}
+                    <div>
+                      <label className="mb-1 block text-xs text-slate-500">Hora (UTC)</label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={23}
+                        value={scheduleForm.hour_utc}
+                        onChange={(e) => setScheduleForm((f) => ({ ...f, hour_utc: parseInt(e.target.value, 10) || 0 }))}
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs text-slate-500">Minuto (UTC)</label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={59}
+                        value={scheduleForm.minute_utc}
+                        onChange={(e) => setScheduleForm((f) => ({ ...f, minute_utc: parseInt(e.target.value, 10) || 0 }))}
+                      />
+                    </div>
+                    <Input
+                      placeholder="Timezone (ex.: America/Sao_Paulo)"
+                      value={scheduleForm.timezone}
+                      onChange={(e) => setScheduleForm((f) => ({ ...f, timezone: e.target.value }))}
+                    />
+                    <select
+                      className="flex h-10 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm"
+                      value={scheduleForm.format}
+                      onChange={(e) => setScheduleForm((f) => ({ ...f, format: e.target.value as 'pdf' | 'csv' | 'link' }))}
+                    >
+                      <option value="link">Link</option>
+                      <option value="pdf">PDF</option>
+                      <option value="csv">CSV</option>
+                    </select>
+                  </div>
+                  <Input
+                    placeholder="Emails (separados por vírgula)"
+                    value={scheduleForm.recipients}
+                    onChange={(e) => setScheduleForm((f) => ({ ...f, recipients: e.target.value }))}
+                  />
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={scheduleForm.is_active}
+                      onChange={(e) => setScheduleForm((f) => ({ ...f, is_active: e.target.checked }))}
+                    />
+                    Ativo
+                  </label>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      onClick={async () => {
+                        if (scheduleEditId) {
+                          await save('report_schedule_update', {
+                            id: scheduleEditId,
+                            ...scheduleForm,
+                          });
+                        } else {
+                          await save('report_schedule_create', {
+                            name: scheduleForm.name,
+                            frequency: scheduleForm.frequency,
+                            day_of_week: scheduleForm.frequency === 'weekly' ? scheduleForm.day_of_week : null,
+                            day_of_month: scheduleForm.frequency === 'monthly' ? scheduleForm.day_of_month : null,
+                            hour_utc: scheduleForm.hour_utc,
+                            minute_utc: scheduleForm.minute_utc,
+                            timezone: scheduleForm.timezone,
+                            recipients: scheduleForm.recipients,
+                            format: scheduleForm.format,
+                          });
+                        }
+                        await loadSettings();
+                        setScheduleFormOpen(false);
+                        setScheduleEditId(null);
+                      }}
+                    >
+                      {scheduleEditId ? 'Salvar' : 'Criar'}
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => { setScheduleFormOpen(false); setScheduleEditId(null); }}>
+                      Cancelar
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="space-y-3 rounded-xl border border-slate-200 p-4">
@@ -1220,10 +1486,11 @@ export function SettingsClient() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <Users className="h-5 w-5 text-indigo-600" />
-            Membros e convites
+            Membros, pessoas e convites
           </CardTitle>
           <p className="text-sm text-slate-500">
-            Convide pessoas por e-mail e gerencie membros da organização. Apenas owner e admin podem convidar ou remover.
+            Convide pessoas por e-mail e gerencie membros internos da organização, além de cadastrar contatos e demais envolvidos da empresa.
+            Apenas perfis de gestão podem alterar essas informações.
           </p>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -1276,6 +1543,253 @@ export function SettingsClient() {
                 ))
               )}
             </ul>
+          </div>
+
+          {/* Pessoas e demais envolvidos da empresa */}
+          <div className="space-y-3">
+            <p className="text-sm font-medium text-slate-700">Pessoas e envolvidos da empresa (ICP / decisores / usuários)</p>
+            {peopleLoading ? (
+              <div className="flex items-center gap-2 text-sm text-slate-500">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Carregando pessoas...
+              </div>
+            ) : (
+              <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50/40 p-3">
+                {people.length === 0 ? (
+                  <p className="text-sm text-slate-500">
+                    Nenhuma pessoa cadastrada ainda. Use o formulário abaixo para registrar decisores, usuários e demais envolvidos da empresa.
+                  </p>
+                ) : (
+                  <ul className="space-y-1.5 text-sm">
+                    {people.map((p) => (
+                      <li
+                        key={p.id}
+                        className="flex flex-wrap items-center justify-between gap-2 rounded border border-slate-100 bg-white px-2 py-1.5"
+                      >
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-medium text-slate-900">{p.full_name}</span>
+                          {p.email && (
+                            <span className="text-xs text-slate-500">
+                              {p.email}
+                            </span>
+                          )}
+                          {p.person_type && (
+                            <Badge variant="outline" className="text-xs">
+                              {p.person_type}
+                            </Badge>
+                          )}
+                          {p.role_title && (
+                            <span className="text-xs text-slate-600">
+                              {p.role_title}
+                            </span>
+                          )}
+                          {p.department && (
+                            <span className="text-xs text-slate-500">
+                              · {p.department}
+                            </span>
+                          )}
+                          {p.is_key_contact && (
+                            <Badge variant="primary" className="text-[10px]">
+                              Contato-chave
+                            </Badge>
+                          )}
+                        </div>
+                        {p.company_name && (
+                          <span className="text-xs text-slate-500">
+                            {p.company_name}
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+
+            {canManage && (
+              <fieldset className={cn(!canManage && 'opacity-75')}>
+                <p className="mt-4 text-sm font-medium text-slate-700">
+                  Cadastrar nova pessoa/envolvido
+                </p>
+                <div className="mt-2 grid gap-3 md:grid-cols-2">
+                  <div>
+                    <label className="mb-1.5 block text-xs font-medium text-slate-700">
+                      Nome completo
+                    </label>
+                    <Input
+                      value={newPersonName}
+                      onChange={(e) => setNewPersonName(e.target.value)}
+                      placeholder="Nome e sobrenome"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-xs font-medium text-slate-700">
+                      E-mail
+                    </label>
+                    <Input
+                      type="email"
+                      value={newPersonEmail}
+                      onChange={(e) => setNewPersonEmail(e.target.value)}
+                      placeholder="contato@empresa.com"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-xs font-medium text-slate-700">
+                      Cargo / função
+                    </label>
+                    <Input
+                      value={newPersonRoleTitle}
+                      onChange={(e) => setNewPersonRoleTitle(e.target.value)}
+                      placeholder="Ex.: CFO, Head de Vendas"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="mb-1.5 block text-xs font-medium text-slate-700">
+                        Tipo de envolvido
+                      </label>
+                      <select
+                        className="w-full rounded-md border border-slate-300 bg-white px-2 py-2 text-xs"
+                        value={newPersonType}
+                        onChange={(e) =>
+                          setNewPersonType(
+                            e.target.value as
+                              | 'decision_maker'
+                              | 'economic_buyer'
+                              | 'champion'
+                              | 'user'
+                              | 'influencer'
+                              | 'stakeholder'
+                              | 'finance'
+                              | 'procurement'
+                              | 'other'
+                          )
+                        }
+                      >
+                        <option value="decision_maker">Decisor principal</option>
+                        <option value="economic_buyer">Comprador econômico</option>
+                        <option value="champion">Champion / sponsor interno</option>
+                        <option value="user">Usuário</option>
+                        <option value="influencer">Influenciador</option>
+                        <option value="finance">Financeiro</option>
+                        <option value="procurement">Compras / Procurement</option>
+                        <option value="stakeholder">Stakeholder geral</option>
+                        <option value="other">Outro</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="mb-1.5 block text-xs font-medium text-slate-700">
+                        Nível
+                      </label>
+                      <select
+                        className="w-full rounded-md border border-slate-300 bg-white px-2 py-2 text-xs"
+                        value={newPersonSeniority}
+                        onChange={(e) =>
+                          setNewPersonSeniority(
+                            e.target.value as
+                              | 'c_level'
+                              | 'vp'
+                              | 'director'
+                              | 'manager'
+                              | 'analyst'
+                              | 'other'
+                          )
+                        }
+                      >
+                        <option value="c_level">C-level / Dono</option>
+                        <option value="vp">VP</option>
+                        <option value="director">Diretor(a)</option>
+                        <option value="manager">Gestor(a)</option>
+                        <option value="analyst">Analista / especialista</option>
+                        <option value="other">Outro</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-xs font-medium text-slate-700">
+                      Área / departamento
+                    </label>
+                    <Input
+                      value={newPersonDept}
+                      onChange={(e) => setNewPersonDept(e.target.value)}
+                      placeholder="Ex.: Finanças, Vendas, TI"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-xs font-medium text-slate-700">
+                      Tag de persona (opcional)
+                    </label>
+                    <Input
+                      value={newPersonPersonaTag}
+                      onChange={(e) => setNewPersonPersonaTag(e.target.value)}
+                      placeholder="Ex.: CFO pragmático, VP growth"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      id="newPersonKey"
+                      type="checkbox"
+                      className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                      checked={newPersonKey}
+                      onChange={(e) => setNewPersonKey(e.target.checked)}
+                    />
+                    <label htmlFor="newPersonKey" className="text-xs text-slate-700">
+                      Marcar como contato-chave para esta empresa
+                    </label>
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <Button
+                    size="sm"
+                    disabled={saving === 'org_people' || !newPersonName.trim()}
+                    onClick={async () => {
+                      setError(null);
+                      setSaving('org_people');
+                      try {
+                        const res = await fetch('/api/org/people', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            full_name: newPersonName.trim(),
+                            email: newPersonEmail.trim() || undefined,
+                            role_title: newPersonRoleTitle.trim() || undefined,
+                            person_type: newPersonType,
+                            department: newPersonDept.trim() || undefined,
+                            seniority: newPersonSeniority,
+                            persona_tag: newPersonPersonaTag.trim() || undefined,
+                            is_key_contact: newPersonKey,
+                          }),
+                        });
+                        const data = await res.json().catch(() => ({}));
+                        if (!res.ok) {
+                          throw new Error((data as { error?: string }).error ?? 'Erro ao cadastrar pessoa');
+                        }
+                        setNewPersonName('');
+                        setNewPersonEmail('');
+                        setNewPersonRoleTitle('');
+                        setNewPersonDept('');
+                        setNewPersonPersonaTag('');
+                        setNewPersonKey(false);
+                        await loadSettings();
+                      } catch (e) {
+                        setError(e instanceof Error ? e.message : 'Erro ao cadastrar pessoa');
+                      } finally {
+                        setSaving(null);
+                      }
+                    }}
+                  >
+                    {saving === 'org_people' ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <>
+                        <Users className="mr-2 h-4 w-4" />
+                        Adicionar pessoa
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </fieldset>
+            )}
           </div>
 
           {canManage && (
@@ -1374,6 +1888,160 @@ export function SettingsClient() {
           )}
         </CardContent>
       </Card>}
+
+      {/* Gestão de usuários da plataforma (somente admin de plataforma) */}
+      {isPlatformAdmin && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <ShieldAlert className="h-5 w-5 text-indigo-600" />
+              Administração de usuários da plataforma
+            </CardTitle>
+            <p className="text-sm text-slate-500">
+              Visualize todos os usuários cadastrados na plataforma, ative/desative acesso e controle quem é administrador global.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {platformUsersError && (
+              <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
+                <AlertCircle className="h-4 w-4" />
+                {platformUsersError}
+              </div>
+            )}
+            {platformUsersLoading ? (
+              <div className="flex items-center gap-2 text-sm text-slate-500">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Carregando usuários da plataforma...
+              </div>
+            ) : (
+              <div className="overflow-x-auto rounded-lg border border-slate-200">
+                <table className="min-w-full text-left text-xs">
+                  <thead className="bg-slate-50 text-slate-500">
+                    <tr>
+                      <th className="px-3 py-2 font-medium">E-mail</th>
+                      <th className="px-3 py-2 font-medium">Criado em</th>
+                      <th className="px-3 py-2 font-medium">Status</th>
+                      <th className="px-3 py-2 font-medium">Admin</th>
+                      <th className="px-3 py-2 font-medium text-right">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 bg-white">
+                    {platformUsers.map((u) => (
+                      <tr key={u.id}>
+                        <td className="px-3 py-2 align-middle text-slate-800">
+                          {u.email}
+                        </td>
+                        <td className="px-3 py-2 align-middle text-slate-500">
+                          {new Date(u.created_at).toLocaleString('pt-BR')}
+                        </td>
+                        <td className="px-3 py-2 align-middle">
+                          <Badge variant={u.is_active ? 'success' : 'outline'} className="text-[10px]">
+                            {u.is_active ? 'Ativo' : 'Inativo'}
+                          </Badge>
+                        </td>
+                        <td className="px-3 py-2 align-middle">
+                          {u.is_platform_admin ? (
+                            <Badge variant="primary" className="text-[10px]">
+                              Admin
+                            </Badge>
+                          ) : (
+                            <span className="text-[11px] text-slate-400">Usuário</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 align-middle">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-[11px]"
+                              disabled={saving === `admin_user_${u.id}`}
+                              onClick={async () => {
+                                setSaving(`admin_user_${u.id}`);
+                                setPlatformUsersError(null);
+                                try {
+                                  const res = await fetch('/api/admin/users', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                      user_id: u.id,
+                                      action: u.is_active ? 'deactivate' : 'activate',
+                                    }),
+                                  });
+                                  const data = await res.json().catch(() => ({}));
+                                  if (!res.ok) {
+                                    throw new Error((data as { error?: string }).error ?? 'Erro ao atualizar usuário');
+                                  }
+                                  await loadSettings();
+                                } catch (e) {
+                                  setPlatformUsersError(e instanceof Error ? e.message : 'Erro ao atualizar usuário');
+                                } finally {
+                                  setSaving(null);
+                                }
+                              }}
+                            >
+                              {saving === `admin_user_${u.id}` ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : u.is_active ? (
+                                'Desativar'
+                              ) : (
+                                'Ativar'
+                              )}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-[11px]"
+                              disabled={saving === `admin_user_role_${u.id}`}
+                              onClick={async () => {
+                                setSaving(`admin_user_role_${u.id}`);
+                                setPlatformUsersError(null);
+                                try {
+                                  const res = await fetch('/api/admin/users', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                      user_id: u.id,
+                                      action: u.is_platform_admin ? 'remove_admin' : 'make_admin',
+                                    }),
+                                  });
+                                  const data = await res.json().catch(() => ({}));
+                                  if (!res.ok) {
+                                    throw new Error((data as { error?: string }).error ?? 'Erro ao atualizar papel de usuário');
+                                  }
+                                  await loadSettings();
+                                } catch (e) {
+                                  setPlatformUsersError(e instanceof Error ? e.message : 'Erro ao atualizar papel de usuário');
+                                } finally {
+                                  setSaving(null);
+                                }
+                              }}
+                            >
+                              {saving === `admin_user_role_${u.id}` ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : u.is_platform_admin ? (
+                                'Remover admin'
+                              ) : (
+                                'Tornar admin'
+                              )}
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    {platformUsers.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="px-3 py-4 text-center text-xs text-slate-500">
+                          Nenhum usuário encontrado.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Limiares de distorção (receita inflada) */}
       {shouldShow('org', [

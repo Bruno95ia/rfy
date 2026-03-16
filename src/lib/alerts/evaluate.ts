@@ -1,4 +1,5 @@
 import type { AdminDbClientType } from '@/lib/supabase/admin';
+import { sendAlertToChannels } from '@/lib/alerts/send-channels';
 
 const AI_BASE = process.env.AI_SERVICE_URL ?? 'http://localhost:8001';
 const AI_FETCH_TIMEOUT_MS = 20000;
@@ -239,6 +240,32 @@ export async function evaluateAlertsForOrg(
       if (eventInsert?.id) {
         events.push({ id: eventInsert.id, rule_id: rule.id });
       }
+
+      const channelIds = Array.isArray(rule.channel_ids) ? rule.channel_ids : [];
+      const payloadJson = {
+        ...evaluated.payload,
+        tipo: evaluated.tipo,
+        generated_at: metrics.generated_at,
+      };
+      if (channelIds.length > 0) {
+        const sendResult = await sendAlertToChannels(admin, channelIds, {
+          titulo: buildAlertTitle(evaluated.tipo),
+          mensagem: String(evaluated.payload.message ?? 'Alerta acionado'),
+          severidade: rule.severity,
+          tipo: evaluated.tipo,
+          payload: evaluated.payload,
+          generated_at: metrics.generated_at,
+        });
+        const eventStatus = sendResult.sent > 0 ? 'sent' : 'failed';
+        await admin
+          .from('alert_events')
+          .update({
+            status: eventStatus,
+            payload_json: { ...payloadJson, _send: { sent: sendResult.sent, failed: sendResult.failed, errors: sendResult.errors } },
+          })
+          .eq('id', eventInsert?.id);
+      }
+
       opened += 1;
       continue;
     }

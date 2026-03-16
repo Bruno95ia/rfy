@@ -5,7 +5,7 @@ import { trackScreen } from '@/lib/analytics/track';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Target, Plus, Loader2 } from 'lucide-react';
+import { Target, Plus, Loader2, FileDown } from 'lucide-react';
 
 type Plan = { id: string; name: string; status: string; period_start: string | null; period_end: string | null; created_at: string };
 
@@ -88,6 +88,14 @@ export function PAIPClient({ initialPlans }: PAIPClientProps) {
                     </span>
                   )}
                 </div>
+                <a
+                  href={`/api/supho/paip/plans/${p.id}/export`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-sm text-indigo-600 hover:underline"
+                >
+                  <FileDown className="h-4 w-4" /> Exportar
+                </a>
               </li>
             ))}
           </ul>

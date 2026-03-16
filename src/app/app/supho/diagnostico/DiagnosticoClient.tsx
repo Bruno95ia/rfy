@@ -7,9 +7,9 @@ import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ClipboardList, Plus, Users, Calculator, ArrowRight, Loader2, Send } from 'lucide-react';
+import { ClipboardList, Plus, Users, Calculator, ArrowRight, Loader2, Send, Save } from 'lucide-react';
 
-type Campaign = { id: string; name: string; status: string; created_at: string };
+type Campaign = { id: string; name: string; status: string; created_at: string; question_ids?: string[] | null };
 type Question = { id: string; block: string; internal_weight: number; question_text: string | null; item_code: string | null; sort_order: number };
 
 interface DiagnosticoClientProps {
@@ -33,6 +33,40 @@ export function DiagnosticoClient({ orgId, initialCampaigns }: DiagnosticoClient
   const [inviteEmails, setInviteEmails] = useState('');
   const [inviting, setInviting] = useState(false);
   const [inviteResult, setInviteResult] = useState<string | null>(null);
+  const [inviteFailed, setInviteFailed] = useState<Array<{ email: string; name?: string; error?: string }>>([]);
+  const [selectedQuestionIds, setSelectedQuestionIds] = useState<string[] | null>(null);
+  const [savingQuestionSelection, setSavingQuestionSelection] = useState(false);
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const parseInviteLines = (text: string): { valid: { email: string; name: string }[]; invalid: string[] } => {
+    const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
+    const valid: { email: string; name: string }[] = [];
+    const invalid: string[] = [];
+    const seen = new Set<string>();
+    for (const line of lines) {
+      const m = line.match(/^(.*)<([^>]+)>$/);
+      const email = (m ? m[2].trim() : line).toLowerCase();
+      const name = m ? m[1].trim() : '';
+      if (!emailRegex.test(email)) {
+        invalid.push(line);
+        continue;
+      }
+      if (seen.has(email)) continue;
+      seen.add(email);
+      valid.push({ email, name });
+    }
+    return { valid, invalid };
+  };
+  const { valid: validRespondents, invalid: invalidInviteLines } = parseInviteLines(inviteEmails);
+  const canSendInvites = validRespondents.length > 0;
+
+  const selectedCampaign = selectedCampaignId ? campaigns.find((c) => c.id === selectedCampaignId) : null;
+  const effectiveQuestions =
+    questions.length === 0
+      ? []
+      : !selectedCampaign?.question_ids || selectedCampaign.question_ids.length === 0
+        ? questions
+        : questions.filter((q) => selectedCampaign.question_ids!.includes(q.id));
 
   const fetchCampaigns = useCallback(async () => {
     const res = await fetch('/api/supho/campaigns');
@@ -76,6 +110,11 @@ export function DiagnosticoClient({ orgId, initialCampaigns }: DiagnosticoClient
   }, [selectedCampaignId, fetchRespondentsCount]);
 
   useEffect(() => {
+    const c = selectedCampaignId ? campaigns.find((x) => x.id === selectedCampaignId) : null;
+    setSelectedQuestionIds(c?.question_ids ?? null);
+  }, [selectedCampaignId, campaigns]);
+
+  useEffect(() => {
     trackScreen('supho_diagnostico');
   }, []);
 
@@ -101,9 +140,29 @@ export function DiagnosticoClient({ orgId, initialCampaigns }: DiagnosticoClient
     }
   };
 
+  const saveQuestionSelection = async () => {
+    if (!selectedCampaignId) return;
+    setSavingQuestionSelection(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/supho/campaigns/${selectedCampaignId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question_ids: selectedQuestionIds }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'Erro ao salvar seleção');
+      await fetchCampaigns();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSavingQuestionSelection(false);
+    }
+  };
+
   const addRespondent = async () => {
-    if (!selectedCampaignId || questions.length === 0) return;
-    const filled = questions.every((q) => {
+    if (!selectedCampaignId || effectiveQuestions.length === 0) return;
+    const filled = effectiveQuestions.every((q) => {
       const v = answers[q.id];
       return typeof v === 'number' && v >= 1 && v <= 5;
     });
@@ -127,7 +186,7 @@ export function DiagnosticoClient({ orgId, initialCampaigns }: DiagnosticoClient
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           respondent_id: respondent.id,
-          answers: questions.map((q) => ({ question_id: q.id, value: answers[q.id] ?? 3 })),
+          answers: effectiveQuestions.map((q) => ({ question_id: q.id, value: answers[q.id] ?? 3 })),
         }),
       });
       const ansData = await resAnswers.json();
@@ -168,24 +227,19 @@ export function DiagnosticoClient({ orgId, initialCampaigns }: DiagnosticoClient
       setError('Selecione uma campanha antes de disparar convites.');
       return;
     }
-    const lines = inviteEmails
-      .split('\n')
-      .map((l) => l.trim())
-      .filter(Boolean);
-    if (lines.length === 0) {
-      setError('Adicione ao menos um email (formato: Nome <email@dominio>).');
+    if (invalidInviteLines.length > 0) {
+      setError(`Linhas com e-mail inválido: ${invalidInviteLines.slice(0, 3).join(', ')}${invalidInviteLines.length > 3 ? '…' : ''}`);
       return;
     }
-    const respondents = lines.map((line) => {
-      const m = line.match(/^(.*)<([^>]+)>$/);
-      if (m) {
-        return { name: m[1].trim(), email: m[2].trim() };
-      }
-      return { name: '', email: line };
-    });
+    if (!canSendInvites) {
+      setError('Adicione ao menos um e-mail válido (um por linha ou no formato Nome <email@dominio>).');
+      return;
+    }
+    const respondents = validRespondents.map((r) => (r.name ? { email: r.email, name: r.name } : { email: r.email }));
     setInviting(true);
     setError(null);
     setInviteResult(null);
+    setInviteFailed([]);
     try {
       const res = await fetch('/api/forms/invites', {
         method: 'POST',
@@ -200,9 +254,16 @@ export function DiagnosticoClient({ orgId, initialCampaigns }: DiagnosticoClient
       if (!res.ok && res.status !== 207) {
         throw new Error(data?.error || 'Erro ao disparar convites');
       }
-      const failed = Array.isArray(data.failed) ? data.failed.length : 0;
-      const success = typeof data.success === 'number' ? data.success : respondents.length - failed;
-      setInviteResult(`Convites enviados: ${success}. Falhas: ${failed}.`);
+      const failedList = Array.isArray(data.failed) ? data.failed : [];
+      const successCount = typeof data.success === 'number' ? data.success : respondents.length - failedList.length;
+      setInviteFailed(failedList);
+      setInviteResult(
+        successCount > 0
+          ? `${successCount} convite(s) enviado(s).${failedList.length > 0 ? ` ${failedList.length} falha(s).` : ''}`
+          : failedList.length > 0
+            ? 'Nenhum convite enviado.'
+            : null
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -304,8 +365,71 @@ export function DiagnosticoClient({ orgId, initialCampaigns }: DiagnosticoClient
                   </div>
                 ) : (
                   <>
+                    <div className="space-y-3 rounded border border-slate-200 bg-slate-50/50 p-3">
+                      <p className="text-xs font-medium text-slate-600">Perguntas desta campanha</p>
+                      <div className="flex flex-wrap gap-2">
+                        <label className="flex cursor-pointer items-center gap-1.5 text-sm">
+                          <input
+                            type="radio"
+                            name="questionScope"
+                            checked={selectedQuestionIds === null}
+                            onChange={() => setSelectedQuestionIds(null)}
+                            className="rounded border-slate-300"
+                          />
+                          Usar todas as perguntas
+                        </label>
+                        <label className="flex cursor-pointer items-center gap-1.5 text-sm">
+                          <input
+                            type="radio"
+                            name="questionScope"
+                            checked={selectedQuestionIds !== null}
+                            onChange={() => setSelectedQuestionIds(selectedQuestionIds?.length ? selectedQuestionIds : questions.map((q) => q.id))}
+                            className="rounded border-slate-300"
+                          />
+                          Usar apenas as selecionadas
+                        </label>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={saveQuestionSelection}
+                          disabled={savingQuestionSelection}
+                        >
+                          {savingQuestionSelection ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                          Salvar seleção
+                        </Button>
+                      </div>
+                      <div className="max-h-[140px] space-y-1.5 overflow-y-auto">
+                        {(['A', 'B', 'C'] as const).map((block) => (
+                          <div key={block} className="space-y-1">
+                            <span className="text-xs font-medium text-slate-500">Bloco {block}</span>
+                            {questions
+                              .filter((q) => q.block === block)
+                              .map((q) => (
+                                <label key={q.id} className="flex cursor-pointer items-start gap-2 text-sm">
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedQuestionIds === null || selectedQuestionIds.includes(q.id)}
+                                    disabled={selectedQuestionIds === null}
+                                    onChange={(e) => {
+                                      if (selectedQuestionIds === null) return;
+                                      if (e.target.checked) {
+                                        setSelectedQuestionIds([...selectedQuestionIds, q.id]);
+                                      } else {
+                                        setSelectedQuestionIds(selectedQuestionIds.filter((id) => id !== q.id));
+                                      }
+                                    }}
+                                    className="mt-0.5 rounded border-slate-300"
+                                  />
+                                  <span className="text-slate-700">{q.question_text || q.item_code || q.id.slice(0, 8)}</span>
+                                </label>
+                              ))}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                     <div className="max-h-[280px] space-y-3 overflow-y-auto rounded border border-slate-100 bg-slate-50/50 p-3">
-                      {questions.map((q) => (
+                      {effectiveQuestions.map((q) => (
                         <div key={q.id} className="flex flex-wrap items-center gap-2 text-sm">
                           <span className="w-6 rounded bg-slate-200 px-1 text-center text-xs font-medium text-slate-600">
                             {q.block}
@@ -353,7 +477,7 @@ export function DiagnosticoClient({ orgId, initialCampaigns }: DiagnosticoClient
                         variant="outline"
                         size="sm"
                         onClick={sendInvites}
-                        disabled={inviting}
+                        disabled={inviting || !canSendInvites}
                       >
                         {inviting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                         Disparar convites por e-mail
@@ -361,8 +485,13 @@ export function DiagnosticoClient({ orgId, initialCampaigns }: DiagnosticoClient
                     </div>
                     <div className="space-y-2">
                       <label className="block text-xs font-medium text-slate-600">
-                        Lista de emails (um por linha, opcionalmente no formato Nome &lt;email@dominio&gt;)
+                        Lista de e-mails (um por linha, opcionalmente no formato Nome &lt;email@dominio&gt;)
                       </label>
+                      {invalidInviteLines.length > 0 && (
+                        <p className="text-xs text-amber-700">
+                          {invalidInviteLines.length} linha(s) com e-mail inválido. Corrija ou remova para enviar.
+                        </p>
+                      )}
                       <textarea
                         value={inviteEmails}
                         onChange={(e) => setInviteEmails(e.target.value)}
@@ -371,7 +500,32 @@ export function DiagnosticoClient({ orgId, initialCampaigns }: DiagnosticoClient
                         placeholder={'Exemplos:\nMaria Silva <maria@empresa.com>\njoao@empresa.com'}
                       />
                       {inviteResult && (
-                        <p className="text-xs text-emerald-700">{inviteResult}</p>
+                        <div className="space-y-1">
+                          <p className="text-xs font-medium text-emerald-700">{inviteResult}</p>
+                          {inviteFailed.length > 0 && (
+                            <ul className="text-xs text-red-700">
+                              {inviteFailed.map((f, i) => (
+                                <li key={i}>
+                                  {f.email}
+                                  {f.error ? `: ${f.error}` : ''}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-xs text-slate-600"
+                            onClick={() => {
+                              setInviteEmails('');
+                              setInviteResult(null);
+                              setInviteFailed([]);
+                            }}
+                          >
+                            Limpar lista
+                          </Button>
+                        </div>
                       )}
                     </div>
                   </>

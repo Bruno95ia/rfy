@@ -10,7 +10,7 @@ export async function GET() {
   const admin = createAdminClient();
   const { data, error } = await admin
     .from('supho_diagnostic_campaigns')
-    .select('id, name, status, started_at, closed_at, created_at')
+    .select('id, name, status, started_at, closed_at, created_at, question_ids')
     .eq('org_id', auth.orgId)
     .order('created_at', { ascending: false });
 

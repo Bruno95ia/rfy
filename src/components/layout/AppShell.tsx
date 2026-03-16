@@ -19,11 +19,14 @@ import {
   Award,
   ClipboardList,
   Plug,
+  TrendingUp,
+  Users,
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/ui/Logo';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 interface NavItem {
   href: string;
@@ -47,6 +50,8 @@ const navItems: NavCategory[] = [
     category: 'Performance',
     items: [
       { href: '/app/reports', label: 'Relatórios', icon: BarChart3 },
+      { href: '/app/forecast', label: 'Previsão', icon: TrendingUp },
+      { href: '/app/ai', label: 'Inteligência IA', icon: Sparkles },
       { href: '/app/copilot-contas', label: 'Copiloto de contas', icon: Sparkles },
     ],
   },
@@ -64,6 +69,7 @@ const navItems: NavCategory[] = [
     category: 'Data',
     items: [
       { href: '/app/uploads', label: 'Uploads', icon: Upload },
+      { href: '/app/pessoas', label: 'Pessoas', icon: Users },
       { href: '/app/integracoes', label: 'Integrações', icon: Plug },
       { href: '/app/settings', label: 'Configurações', icon: Settings },
     ],
@@ -232,6 +238,8 @@ export function AppShell({
                   Upload CSV
                 </Button>
               </Link>
+
+              <ThemeToggle />
 
               <div className="relative">
                 <button

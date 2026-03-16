@@ -114,13 +114,35 @@ export function UploadsList({ uploads }: { uploads: UploadRecord[] }) {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'uploaded' | 'processing' | 'done' | 'failed'>('all');
   const [kindFilter, setKindFilter] = useState<'all' | 'opportunities' | 'activities'>('all');
+  const [reprocessingId, setReprocessingId] = useState<string | null>(null);
 
-  const handleReprocess = (id: string, filename: string) => {
-    toast({
-      title: 'Em breve',
-      description: `Reprocessar "${filename}" estará disponível em breve.`,
-      variant: 'default',
-    });
+  const handleReprocess = async (id: string, filename: string) => {
+    setReprocessingId(id);
+    try {
+      const res = await fetch('/api/upload/reprocess', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uploadId: id }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.error ?? `Erro ${res.status}`);
+      }
+      toast({
+        title: 'Reprocessamento enfileirado',
+        description: `"${filename}" será processado novamente em instantes.`,
+        variant: 'default',
+      });
+      window.location.reload();
+    } catch (err) {
+      toast({
+        title: 'Erro ao reprocessar',
+        description: err instanceof Error ? err.message : String(err),
+        variant: 'destructive',
+      });
+    } finally {
+      setReprocessingId(null);
+    }
   };
 
   const handleViewError = (filename: string, error: string | null) => {
@@ -291,8 +313,13 @@ export function UploadsList({ uploads }: { uploads: UploadRecord[] }) {
                         size="sm"
                         className="h-8 text-slate-500 hover:text-slate-900"
                         onClick={() => handleReprocess(u.id, u.filename)}
+                        disabled={u.status === 'processing' || reprocessingId === u.id}
                       >
-                        <RefreshCw className="h-4 w-4" />
+                        {reprocessingId === u.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <RefreshCw className="h-4 w-4" />
+                        )}
                         Reprocessar
                       </Button>
                       <Button

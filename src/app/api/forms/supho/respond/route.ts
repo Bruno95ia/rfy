@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
 
   const { data: campaign, error: campaignError } = await admin
     .from('supho_diagnostic_campaigns')
-    .select('id, org_id')
+    .select('id, org_id, question_ids')
     .eq('id', campaignId)
     .single();
 
@@ -89,11 +89,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: orgQuestions.error.message }, { status: 500 });
   }
 
-  const validQuestionIds = new Set<string>();
+  let validQuestionIds = new Set<string>();
   for (const row of (globalQuestions.data ?? []) as Array<{ id: string }>) validQuestionIds.add(row.id);
   for (const row of (orgQuestions.data ?? []) as Array<{ id: string }>) validQuestionIds.add(row.id);
+  const campaignQuestionIds = campaign.question_ids as string[] | null | undefined;
+  if (Array.isArray(campaignQuestionIds) && campaignQuestionIds.length > 0) {
+    const allowedSet = new Set(campaignQuestionIds);
+    validQuestionIds = new Set([...validQuestionIds].filter((id) => allowedSet.has(id)));
+  }
   if (validQuestionIds.size !== questionIds.length) {
-    return NextResponse.json({ error: 'Payload inválido: contém perguntas desconhecidas' }, { status: 400 });
+    return NextResponse.json(
+      { error: 'Payload inválido: contém perguntas desconhecidas ou não permitidas para esta campanha' },
+      { status: 400 }
+    );
   }
 
   const { data: respondent, error: respError } = await admin

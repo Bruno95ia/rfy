@@ -2,6 +2,7 @@ import { getCurrentUser } from '@/lib/auth-session';
 import { redirect } from 'next/navigation';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
+import { appendFile } from 'node:fs/promises';
 
 export type OrgRole = 'owner' | 'admin' | 'manager' | 'viewer';
 const ROLE_WEIGHT: Record<OrgRole, number> = {
@@ -151,6 +152,36 @@ export async function requireApiUserOrgAccess(
 
   const orgId = orgIdParam?.trim() || (await getOrgIdForUser(auth.user.id));
   if (!orgId) {
+    // #region agent log
+    fetch('http://localhost:7298/ingest/81cfdc9b-8f3a-42d7-bcbf-e3113764efc8', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Debug-Session-Id': '497d65',
+      },
+      body: JSON.stringify({
+        sessionId: '497d65',
+        runId: 'pre-fix',
+        hypothesisId: 'H1',
+        location: 'src/lib/auth.ts:152-158',
+        message: 'Org não encontrada em requireApiUserOrgAccess',
+        data: { userId: auth.user.id, orgIdParam },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    appendFile(
+      '/home/ubuntu/rfy/.cursor/debug-497d65.log',
+      JSON.stringify({
+        sessionId: '497d65',
+        runId: 'pre-fix',
+        hypothesisId: 'H1',
+        location: 'src/lib/auth.ts:152-158',
+        message: 'Org não encontrada em requireApiUserOrgAccess',
+        data: { userId: auth.user.id, orgIdParam },
+        timestamp: Date.now(),
+      }) + '\n'
+    ).catch(() => {});
+    // #endregion
     return {
       ok: false,
       response: NextResponse.json({ error: 'Organização não encontrada' }, { status: 404 }),
@@ -158,6 +189,36 @@ export async function requireApiUserOrgAccess(
   }
 
   if (!(await userHasOrgAccess(auth.user.id, orgId))) {
+    // #region agent log
+    fetch('http://localhost:7298/ingest/81cfdc9b-8f3a-42d7-bcbf-e3113764efc8', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Debug-Session-Id': '497d65',
+      },
+      body: JSON.stringify({
+        sessionId: '497d65',
+        runId: 'pre-fix',
+        hypothesisId: 'H2',
+        location: 'src/lib/auth.ts:160-165',
+        message: 'Sem acesso à org em requireApiUserOrgAccess',
+        data: { userId: auth.user.id, orgId },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    appendFile(
+      '/home/ubuntu/rfy/.cursor/debug-497d65.log',
+      JSON.stringify({
+        sessionId: '497d65',
+        runId: 'pre-fix',
+        hypothesisId: 'H2',
+        location: 'src/lib/auth.ts:160-165',
+        message: 'Sem acesso à org em requireApiUserOrgAccess',
+        data: { userId: auth.user.id, orgId },
+        timestamp: Date.now(),
+      }) + '\n'
+    ).catch(() => {});
+    // #endregion
     return {
       ok: false,
       response: NextResponse.json({ error: 'Sem permissão' }, { status: 403 }),
@@ -294,4 +355,44 @@ export async function userHasMinimumOrgRole(
   const role = await getOrgMemberRole(userId, orgId);
   if (!role) return false;
   return ROLE_WEIGHT[role] >= ROLE_WEIGHT[minRole];
+}
+
+/**
+ * Verifica se o usuário é admin de plataforma (gestão global de usuários).
+ */
+export async function isPlatformAdmin(userId: string): Promise<boolean> {
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from('app_users')
+    .select('id, is_platform_admin, is_active')
+    .eq('id', userId)
+    .maybeSingle();
+  if (!data) return false;
+  // Só considera admin se o usuário estiver ativo
+  return Boolean((data as { is_platform_admin?: boolean; is_active?: boolean }).is_platform_admin) &&
+    (data as { is_platform_admin?: boolean; is_active?: boolean }).is_active !== false;
+}
+
+/**
+ * Para API routes: exige usuário autenticado e admin de plataforma.
+ */
+export async function requirePlatformAdminApi(): Promise<
+  | { ok: true; user: AuthUser }
+  | { ok: false; response: NextResponse }
+> {
+  const auth = await requireApiAuth();
+  if (!auth.ok) return auth;
+
+  const canAdmin = await isPlatformAdmin(auth.user.id);
+  if (!canAdmin) {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { error: 'Apenas administradores da plataforma podem acessar este recurso' },
+        { status: 403 }
+      ),
+    };
+  }
+
+  return { ok: true, user: auth.user };
 }

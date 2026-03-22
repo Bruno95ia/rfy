@@ -16,7 +16,18 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
+      testIgnore: /demo-rfy-video\.spec\.ts/,
       use: { ...devices['Desktop Chrome'] },
+    },
+    {
+      name: 'demo-video',
+      testMatch: /demo-rfy-video\.spec\.ts/,
+      use: {
+        ...devices['Desktop Chrome'],
+        video: 'on',
+        viewport: { width: 1280, height: 720 },
+        launchOptions: { slowMo: 70 },
+      },
     },
   ],
   // Reutiliza servidor já em :3000 (evita "port already in use" em CI ou host com app ativa).

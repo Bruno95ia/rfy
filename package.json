@@ -13,6 +13,7 @@
     "test": "vitest run --coverage",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "demo:video": "bash scripts/demo-video.sh",
     "inngest": "npx inngest-cli@latest dev",
     "setup": "bash scripts/setup.sh",
     "db:up": "bash scripts/db-up.sh",

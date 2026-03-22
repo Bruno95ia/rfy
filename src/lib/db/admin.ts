@@ -16,8 +16,12 @@ interface QueryBuilder<T = QueryResultRow> {
   eq(column: string, value: unknown): QueryBuilder<T>;
   gte(column: string, value: unknown): QueryBuilder<T>;
   in(column: string, values: unknown[]): QueryBuilder<T>;
+  ilike(column: string, pattern: string): QueryBuilder<T>;
+  is(column: string, value: null): QueryBuilder<T>;
+  not(column: string, op: 'is', value: null): QueryBuilder<T>;
   order(column: string, opts?: { ascending?: boolean }): QueryBuilder<T>;
   limit(n: number): QueryBuilder<T>;
+  range(from: number, to: number): QueryBuilder<T>;
   single(): Promise<{ data: T | null; error: DbError | null }>;
   maybeSingle(): Promise<{ data: T | null; error: DbError | null }>;
   then(
@@ -25,13 +29,20 @@ interface QueryBuilder<T = QueryResultRow> {
   ): void;
 }
 
-interface InsertBuilder<T = QueryResultRow> {
+interface InsertBuilder<T = QueryResultRow> extends PromiseLike<{ data: T | T[] | null; error: DbError | null }> {
   select(columns?: string): InsertBuilder<T>;
   single(): Promise<{ data: T | null; error: DbError | null }>;
 }
 
-interface UpdateBuilder {
+/** Resultado de update().eq() quando usado com await. */
+export type UpdateResult = { error: DbError | null };
+
+/** Resultado de delete().eq() quando usado com await. */
+export type DeleteResult = { error: DbError | null };
+
+interface UpdateBuilder extends PromiseLike<UpdateResult> {
   eq(column: string, value: unknown): UpdateBuilder;
+  is(column: string, value: null): UpdateBuilder;
 }
 
 const allowedTableNames = new Set([
@@ -40,7 +51,13 @@ const allowedTableNames = new Set([
   'activities', 'reports', 'plans', 'usage_limits', 'usage_events', 'alert_channels', 'alert_rules',
   'alert_events', 'alerts', 'outbound_webhooks', 'report_schedules', 'data_quality_runs',
   'forecast_scenarios', 'quarterly_goals', 'retention_cohorts', 'crm_integrations',
-  'supho_campaigns', 'supho_questions', 'supho_answers', 'supho_diagnostic_results', 'supho_diagnostic_result_respondents',
+  'supho_campaigns',
+  'supho_diagnostic_campaigns',
+  'supho_respondents',
+  'supho_questions',
+  'supho_answers',
+  'supho_diagnostic_results',
+  'supho_diagnostic_result_respondents',
   'supho_paip_plans', 'metrics_status', 'app_users', 'app_sessions', 'form_invites',
 ]);
 
@@ -74,20 +91,22 @@ export type AdminDbClientType = InstanceType<typeof AdminDbClient>;
 export class AdminDbClient {
   private pool = getPool();
 
-  from<T = QueryResultRow>(table: string): QueryBuilder<T> & {
-    insert(row: Record<string, unknown>): InsertBuilder<T>;
+  from<T extends QueryResultRow = QueryResultRow>(table: string): QueryBuilder<T> & {
+    insert(rowOrRows: Record<string, unknown> | Record<string, unknown>[]): InsertBuilder<T>;
     update(row: Record<string, unknown>): UpdateBuilder;
-    upsert(row: Record<string, unknown>, opts?: { onConflict?: string; ignoreDuplicates?: boolean }): Promise<{ data: unknown; error: DbError | null }>;
-    delete(): QueryBuilder<T>;
+    upsert(rowOrRows: Record<string, unknown> | Record<string, unknown>[], opts?: { onConflict?: string; ignoreDuplicates?: boolean }): Promise<{ data: unknown; error: DbError | null }>;
+    delete(): QueryBuilder<T> & PromiseLike<DeleteResult>;
   } {
     const t = safeTable(table);
     let selectCols: string | null = null;
     let countOnly = false;
     let headOnly = false;
-    const conditions: { type: 'eq' | 'gte' | 'in'; col: string; val: unknown }[] = [];
+    const conditions: { type: 'eq' | 'gte' | 'in' | 'ilike' | 'is' | 'not_null'; col: string; val: unknown }[] = [];
     let orderCol: string | null = null;
     let orderAsc = true;
     let limitVal: number | null = null;
+    let offsetVal: number | null = null;
+    let countExact = false;
     let isDelete = false;
     let updateRow: Record<string, unknown> | null = null;
     let insertRow: Record<string, unknown> | null = null;
@@ -112,9 +131,17 @@ export class AdminDbClient {
             params.push(c.val);
             idx++;
           } else if (c.type === 'in') {
-            sql += `${prefix}${safeColumn(c.col)} = ANY($${idx}::text[])`;
+            sql += `${prefix}${safeColumn(c.col)}::text = ANY($${idx}::text[])`;
             params.push(Array.isArray(c.val) ? c.val : [c.val]);
             idx++;
+          } else if (c.type === 'ilike') {
+            sql += `${prefix}${safeColumn(c.col)} ILIKE $${idx}`;
+            params.push(c.val);
+            idx++;
+          } else if (c.type === 'is' && c.val === null) {
+            sql += `${prefix}${safeColumn(c.col)} IS NULL`;
+          } else if (c.type === 'not_null') {
+            sql += `${prefix}${safeColumn(c.col)} IS NOT NULL`;
           }
         }
         const r = await this.pool.query<{ count: number }>(sql, params);
@@ -135,15 +162,56 @@ export class AdminDbClient {
           params.push(c.val);
           idx++;
         } else if (c.type === 'in') {
-          sql += `${prefix}${safeColumn(c.col)} = ANY($${idx}::text[])`;
-          params.push(Array.isArray(c.val) ? c.val : [c.val]);
-          idx++;
+            sql += `${prefix}${safeColumn(c.col)}::text = ANY($${idx}::text[])`;
+            params.push(Array.isArray(c.val) ? c.val : [c.val]);
+            idx++;
+          } else if (c.type === 'ilike') {
+            sql += `${prefix}${safeColumn(c.col)} ILIKE $${idx}`;
+            params.push(c.val);
+            idx++;
+          } else if (c.type === 'is' && c.val === null) {
+            sql += `${prefix}${safeColumn(c.col)} IS NULL`;
+          } else if (c.type === 'not_null') {
+            sql += `${prefix}${safeColumn(c.col)} IS NOT NULL`;
+          }
         }
-      }
       if (orderCol) sql += ` ORDER BY ${safeColumn(orderCol)} ${orderAsc ? 'ASC' : 'DESC'}`;
+      if (offsetVal != null && offsetVal > 0) sql += ` OFFSET ${offsetVal}`;
       if (limitVal != null) sql += ` LIMIT ${Math.max(1, Math.min(limitVal, 1000))}`;
+      let count: number | undefined;
+      if (countExact) {
+        let countSql = `SELECT count(*)::int AS c FROM ${t}`;
+        const countParams: unknown[] = [];
+        let ci = 1;
+        for (const c of conditions) {
+          const prefix = countParams.length === 0 ? ' WHERE ' : ' AND ';
+          if (c.type === 'eq') {
+            countSql += `${prefix}${safeColumn(c.col)} = $${ci}`;
+            countParams.push(c.val);
+            ci++;
+          } else if (c.type === 'gte') {
+            countSql += `${prefix}${safeColumn(c.col)} >= $${ci}`;
+            countParams.push(c.val);
+            ci++;
+          } else if (c.type === 'in') {
+            countSql += `${prefix}${safeColumn(c.col)}::text = ANY($${ci}::text[])`;
+            countParams.push(Array.isArray(c.val) ? c.val : [c.val]);
+            ci++;
+          } else if (c.type === 'ilike') {
+            countSql += `${prefix}${safeColumn(c.col)} ILIKE $${ci}`;
+            countParams.push(c.val);
+            ci++;
+          } else if (c.type === 'is' && c.val === null) {
+            countSql += `${prefix}${safeColumn(c.col)} IS NULL`;
+          } else if (c.type === 'not_null') {
+            countSql += `${prefix}${safeColumn(c.col)} IS NOT NULL`;
+          }
+        }
+        const cr = await this.pool.query<{ c: number }>(countSql, countParams);
+        count = cr.rows[0]?.c ?? 0;
+      }
       const r = await this.pool.query<T>(sql, params);
-      return { data: r.rows, error: null };
+      return { data: r.rows, error: null, count };
     };
 
     const runInsert = async (): Promise<{ data: T | T[] | null; error: DbError | null }> => {
@@ -179,30 +247,35 @@ export class AdminDbClient {
     };
 
     const runUpdate = async (): Promise<{ data: unknown; error: DbError | null }> => {
-      if (!updateRow) return { error: { message: 'No update row' } };
+      if (!updateRow) return { data: null, error: { message: 'No update row' } };
       const setKeys = Object.keys(updateRow).filter((k) => updateRow![k] !== undefined);
-      if (setKeys.length === 0) return { error: null };
+      if (setKeys.length === 0) return { data: null, error: null };
       const setClause = setKeys.map((k, i) => `${safeColumn(k)} = $${i + 1}`).join(', ');
       const params = setKeys.map((k) => updateRow![k]);
       let idx = params.length + 1;
       let sql = `UPDATE ${t} SET ${setClause}`;
+      let whereStarted = false;
       for (const c of conditions) {
         if (c.type === 'eq') {
-          sql += (idx === params.length + 1 ? ' WHERE ' : ' AND ') + `${safeColumn(c.col)} = $${idx}`;
+          sql += (!whereStarted ? ' WHERE ' : ' AND ') + `${safeColumn(c.col)} = $${idx}`;
+          whereStarted = true;
           params.push(c.val);
           idx++;
+        } else if (c.type === 'is' && c.val === null) {
+          sql += (!whereStarted ? ' WHERE ' : ' AND ') + `${safeColumn(c.col)} IS NULL`;
+          whereStarted = true;
         }
       }
       try {
         await this.pool.query(sql, params);
-        return { error: null };
+        return { data: null, error: null };
       } catch (e) {
-        return { error: { message: e instanceof Error ? e.message : String(e) } };
+        return { data: null, error: { message: e instanceof Error ? e.message : String(e) } };
       }
     };
 
     const runUpsert = async (): Promise<{ data: unknown; error: DbError | null }> => {
-      if (!upsertRow) return { error: { message: 'No upsert row' } };
+      if (!upsertRow) return { data: null, error: { message: 'No upsert row' } };
       const keys = Object.keys(upsertRow).map((k) => safeColumn(k));
       const cols = keys.join(', ');
       const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
@@ -219,14 +292,14 @@ export class AdminDbClient {
       const sql = `INSERT INTO ${t} (${cols}) VALUES (${placeholders}) ON CONFLICT (${conflictColList}) ${doUpdate}`;
       try {
         await this.pool.query(sql, values);
-        return { error: null };
+        return { data: null, error: null };
       } catch (e) {
-        return { error: { message: e instanceof Error ? e.message : String(e) } };
+        return { data: null, error: { message: e instanceof Error ? e.message : String(e) } };
       }
     };
 
     const runUpsertMany = async (rows: Record<string, unknown>[]): Promise<{ data: unknown; error: DbError | null }> => {
-      if (rows.length === 0) return { error: null };
+      if (rows.length === 0) return { data: null, error: null };
       const keys = Object.keys(rows[0]).map((k) => safeColumn(k));
       const cols = keys.join(', ');
       const conflictCols = upsertOpts?.onConflict ?? 'id';
@@ -243,9 +316,9 @@ export class AdminDbClient {
       const sql = `INSERT INTO ${t} (${cols}) VALUES (${placeholders}) ON CONFLICT (${conflictColList}) ${doUpdate}`;
       try {
         await this.pool.query(sql, values);
-        return { error: null };
+        return { data: null, error: null };
       } catch (e) {
-        return { error: { message: e instanceof Error ? e.message : String(e) } };
+        return { data: null, error: { message: e instanceof Error ? e.message : String(e) } };
       }
     };
 
@@ -260,39 +333,57 @@ export class AdminDbClient {
       }
       try {
         await this.pool.query(sql, params);
-        return { error: null };
+        return { data: null, error: null };
       } catch (e) {
-        return { error: { message: e instanceof Error ? e.message : String(e) } };
+        return { data: null, error: { message: e instanceof Error ? e.message : String(e) } };
       }
     };
 
     const builder: Record<string, unknown> = {
       select(columns?: string, opts?: SelectOpts) {
         selectCols = columns ?? '*';
-        countOnly = opts?.count === 'exact';
+        countOnly = opts?.count === 'exact' && opts?.head === true;
         headOnly = opts?.head === true;
-        return builder as QueryBuilder<T>;
+        countExact = opts?.count === 'exact' && !headOnly;
+        return builder as unknown as QueryBuilder<T>;
       },
       eq(column: string, value: unknown) {
         conditions.push({ type: 'eq', col: column, val: value });
-        return builder as QueryBuilder<T>;
+        return builder as unknown as QueryBuilder<T>;
       },
       gte(column: string, value: unknown) {
         conditions.push({ type: 'gte', col: column, val: value });
-        return builder as QueryBuilder<T>;
+        return builder as unknown as QueryBuilder<T>;
       },
       in(column: string, values: unknown[]) {
         conditions.push({ type: 'in', col: column, val: values });
-        return builder as QueryBuilder<T>;
+        return builder as unknown as QueryBuilder<T>;
+      },
+      ilike(column: string, pattern: string) {
+        conditions.push({ type: 'ilike', col: column, val: pattern });
+        return builder as unknown as QueryBuilder<T>;
+      },
+      is(column: string, value: null) {
+        conditions.push({ type: 'is', col: column, val: value });
+        return builder as unknown as QueryBuilder<T>;
+      },
+      not(column: string, _op: 'is', value: null) {
+        if (value === null) conditions.push({ type: 'not_null', col: column, val: null });
+        return builder as unknown as QueryBuilder<T>;
       },
       order(column: string, opts?: { ascending?: boolean }) {
         orderCol = column;
         orderAsc = opts?.ascending !== false;
-        return builder as QueryBuilder<T>;
+        return builder as unknown as QueryBuilder<T>;
       },
       limit(n: number) {
         limitVal = n;
-        return builder as QueryBuilder<T>;
+        return builder as unknown as QueryBuilder<T>;
+      },
+      range(from: number, to: number) {
+        offsetVal = Math.max(0, from);
+        limitVal = Math.max(1, to - from + 1);
+        return builder as unknown as QueryBuilder<T>;
       },
       async single() {
         limitVal = 1;
@@ -336,13 +427,26 @@ export class AdminDbClient {
       },
       update(row: Record<string, unknown>) {
         updateRow = row;
-        const updateBuilder: UpdateBuilder & { then(resolve: (v: { error: DbError | null }) => void): Promise<void> } = {
+        const updateBuilder: UpdateBuilder = {
           eq(column: string, value: unknown) {
             conditions.push({ type: 'eq', col: column, val: value });
             return updateBuilder;
           },
-          then(resolve: (v: { error: DbError | null }) => void) {
-            return runUpdate().then(resolve) as Promise<void>;
+          is(column: string, value: null) {
+            conditions.push({ type: 'is', col: column, val: value });
+            return updateBuilder;
+          },
+          then<TResult1 = UpdateResult, TResult2 = never>(
+            onfulfilled?: ((value: UpdateResult) => TResult1 | PromiseLike<TResult1>) | null,
+            onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null
+          ): PromiseLike<TResult1 | TResult2> {
+            return runUpdate().then(
+              (v) => {
+                const result: UpdateResult = { error: v.error };
+                return onfulfilled ? onfulfilled(result) : (result as unknown as TResult1);
+              },
+              onrejected
+            ) as PromiseLike<TResult1 | TResult2>;
           },
         };
         return updateBuilder;
@@ -359,14 +463,19 @@ export class AdminDbClient {
       delete() {
         isDelete = true;
         return Object.assign(builder, {
-          async then(resolve: (v: { data: null; error: DbError | null }) => void) {
+          async then(resolve: (v: DeleteResult) => void) {
             resolve(await runDelete());
           },
         });
       },
     };
 
-    return builder as ReturnType<AdminDbClient['from']>;
+    return builder as unknown as (QueryBuilder<T> & {
+      insert(rowOrRows: Record<string, unknown> | Record<string, unknown>[]): InsertBuilder<T>;
+      update(row: Record<string, unknown>): UpdateBuilder;
+      upsert(rowOrRows: Record<string, unknown> | Record<string, unknown>[], opts?: { onConflict?: string; ignoreDuplicates?: boolean }): Promise<{ data: unknown; error: DbError | null }>;
+      delete(): QueryBuilder<T> & PromiseLike<DeleteResult>;
+    });
   }
 
   get storage(): StorageApi {

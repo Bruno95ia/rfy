@@ -17,14 +17,28 @@ function getDatabaseUrl(): string {
   return url.trim();
 }
 
-export function getPool(): Pool {
-  if (globalForDb.pool) return globalForDb.pool;
-  const pool = new Pool({
-    connectionString: getDatabaseUrl(),
+function getPoolConfig(): ConstructorParameters<typeof Pool>[0] {
+  const connectionString = getDatabaseUrl();
+  const config: ConstructorParameters<typeof Pool>[0] = {
+    connectionString,
     max: 10,
     idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 10000,
-  });
+    connectionTimeoutMillis: 5000,
+  };
+  // SSL: quando a URL exige SSL (ex.: RDS com sslmode=require), desativa verificação da cadeia
+  // para evitar "self signed certificate in certificate chain". Para exigir verificação,
+  // defina DATABASE_SSL_REJECT_UNAUTHORIZED=true.
+  if (connectionString.includes('sslmode=require') || connectionString.includes('ssl=true')) {
+    config.ssl = {
+      rejectUnauthorized: process.env.DATABASE_SSL_REJECT_UNAUTHORIZED === 'true',
+    };
+  }
+  return config;
+}
+
+export function getPool(): Pool {
+  if (globalForDb.pool) return globalForDb.pool;
+  const pool = new Pool(getPoolConfig());
   globalForDb.pool = pool;
   return pool;
 }

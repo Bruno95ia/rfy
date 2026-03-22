@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
     .from('supho_ritual_templates')
     .select('id')
     .eq('org_id', auth.orgId);
-  const ids = (templateRows ?? []).map((t: { id: string }) => t.id);
+  const ids = (templateRows ?? []).map((t) => (t as { id: string }).id);
   if (ids.length === 0) return NextResponse.json([]);
 
   let query = admin
@@ -36,12 +36,12 @@ export async function GET(req: NextRequest) {
     .from('supho_ritual_templates')
     .select('id, type, cadence, default_agenda')
     .in('id', ids);
-  const detailMap = new Map((templateDetails ?? []).map((t: { id: string }) => [t.id, t]));
+  const detailMap = new Map((templateDetails ?? []).map((t) => [(t as { id: string }).id, t]));
 
-  const enriched = (rituals ?? []).map((r: { template_id: string; [k: string]: unknown }) => ({
-    ...r,
-    template: detailMap.get(r.template_id),
-  }));
+  const enriched = (rituals ?? []).map((r) => {
+    const row = r as { template_id: string; [k: string]: unknown };
+    return { ...row, template: detailMap.get(row.template_id) };
+  });
 
   return NextResponse.json(enriched);
 }

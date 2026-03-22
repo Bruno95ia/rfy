@@ -626,6 +626,36 @@ export function DashboardClient({
   }));
 
   if (!snapshot) {
+    const steps = [
+      {
+        n: 1,
+        title: 'Ingerir dados',
+        body: 'Envie CSVs (Oportunidades e Atividades) em Uploads ou configure o webhook em Configurações.',
+        href: '/app/uploads',
+        hrefLabel: 'Abrir Uploads',
+      },
+      {
+        n: 2,
+        title: 'Aguardar processamento',
+        body: 'O relatório é gerado automaticamente (fila Inngest). Atualize o dashboard em alguns instantes.',
+        href: '/app/dashboard',
+        hrefLabel: 'Atualizar depois',
+      },
+      {
+        n: 3,
+        title: 'Explorar o Control Deck',
+        body: 'Com dados, você verá RFY Index, fricções e decisões prioritárias nesta página.',
+        href: '/app/dashboard',
+        hrefLabel: 'Voltar ao dashboard',
+      },
+      {
+        n: 4,
+        title: 'Opcional: SUPHO',
+        body: 'Diagnóstico de maturidade comercial e painel ITSMO em SUPHO → Diagnóstico.',
+        href: '/app/supho/diagnostico',
+        hrefLabel: 'Ir ao SUPHO',
+      },
+    ];
     return (
       <Card className="border-[var(--color-border)] bg-[var(--color-surface)]">
         <CardContent className="grid gap-8 px-6 py-10 lg:grid-cols-[1.2fr_0.8fr]">
@@ -647,30 +677,41 @@ export function DashboardClient({
                 Fazer primeiro upload
               </Link>
               <Link
+                href="/app/integracoes"
+                className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2 text-sm font-medium text-[var(--color-text)]"
+              >
+                Integrações
+              </Link>
+              <Link
                 href="/app/settings"
                 className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2 text-sm font-medium text-[var(--color-text)]"
               >
-                Configurar integração
+                Configurações
               </Link>
             </div>
           </div>
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Checklist de ativação</CardTitle>
+              <CardTitle className="text-base">Primeiro valor em 4 passos</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2">
-              {[
-                'Enviar CSV de Oportunidades',
-                'Enviar CSV de Atividades',
-                'Conectar webhook do CRM',
-                'Validar limiares de alerta',
-              ].map((step) => (
+            <CardContent className="space-y-3">
+              {steps.map((step) => (
                 <div
-                  key={step}
-                  className="rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3 py-2 text-sm text-[var(--color-text)]"
+                  key={step.n}
+                  className="rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3 py-2.5"
                 >
-                  {step}
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
+                    Passo {step.n}
+                  </p>
+                  <p className="text-sm font-medium text-[var(--color-text)]">{step.title}</p>
+                  <p className="mt-1 text-xs text-[var(--color-text-muted)]">{step.body}</p>
+                  <Link
+                    href={step.href}
+                    className="mt-2 inline-block text-xs font-medium text-[var(--color-primary)] hover:underline"
+                  >
+                    {step.hrefLabel} →
+                  </Link>
                 </div>
               ))}
             </CardContent>
@@ -692,6 +733,25 @@ export function DashboardClient({
                 ? 'Não foi possível conectar ao banco de dados. Verifique o projeto Supabase e as credenciais.'
                 : 'IA temporariamente indisponível. Os valores usam estimativa heurística.'}
             </span>
+          </CardContent>
+        </Card>
+      )}
+
+      {isExecutive && !suphoResult && (
+        <Card className="border-[var(--color-border)] bg-[var(--color-surface-muted)]/60">
+          <CardContent className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-medium text-[var(--color-text)]">Próximo passo: maturidade comercial (SUPHO)</p>
+              <p className="text-xs text-[var(--color-text-muted)]">
+                Ainda sem diagnóstico SUPHO nesta org. Inicie uma campanha para ver o painel ITSMO e o PAIP.
+              </p>
+            </div>
+            <Link
+              href="/app/supho/diagnostico"
+              className="shrink-0 rounded-[var(--radius-md)] bg-[var(--color-primary)] px-3 py-1.5 text-center text-xs font-medium text-[var(--color-primary-foreground)]"
+            >
+              Abrir diagnóstico SUPHO
+            </Link>
           </CardContent>
         </Card>
       )}

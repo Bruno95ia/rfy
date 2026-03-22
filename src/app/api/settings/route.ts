@@ -10,7 +10,6 @@ import {
 import { encrypt } from '@/lib/crypto';
 import { appendAuditLog } from '@/lib/billing';
 import { computeNextRunAt } from '@/lib/reports/next-run';
-import { appendFile } from 'node:fs/promises';
 
 type RoleGate = 'manage' | 'member';
 
@@ -45,36 +44,6 @@ export async function GET() {
   const admin = createAdminClient();
   const role = (await getOrgMemberRole(user.id, orgId)) ?? 'viewer';
 
-  // #region agent log
-  fetch('http://localhost:7298/ingest/81cfdc9b-8f3a-42d7-bcbf-e3113764efc8', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Debug-Session-Id': '497d65',
-    },
-    body: JSON.stringify({
-      sessionId: '497d65',
-      runId: 'pre-fix',
-      hypothesisId: 'H3',
-      location: 'src/app/api/settings/route.ts:82-90',
-      message: 'GET /api/settings role resolvida',
-      data: { userId: user.id, orgId, role },
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-  appendFile(
-    '/home/ubuntu/rfy/.cursor/debug-497d65.log',
-    JSON.stringify({
-      sessionId: '497d65',
-      runId: 'pre-fix',
-      hypothesisId: 'H3',
-      location: 'src/app/api/settings/route.ts:82-90',
-      message: 'GET /api/settings role resolvida',
-      data: { userId: user.id, orgId, role },
-      timestamp: Date.now(),
-    }) + '\n'
-  ).catch(() => {});
-  // #endregion
   const { data: org } = await admin
     .from('orgs')
     .select('name')
@@ -404,6 +373,11 @@ export async function GET() {
     // ignore, fallback permanece false
   }
 
+  const emailOutboundConfigured = Boolean(process.env.RESEND_API_KEY?.trim());
+  const inngestConfigured = Boolean(
+    process.env.INNGEST_SIGNING_KEY?.trim() || process.env.INNGEST_EVENT_KEY?.trim()
+  );
+
   return NextResponse.json({
     org: { id: orgId, name: org?.name ?? 'Minha organização' },
     role,
@@ -415,6 +389,10 @@ export async function GET() {
     webhookBaseUrl: process.env.NEXT_PUBLIC_APP_URL
       ? `${process.env.NEXT_PUBLIC_APP_URL}/api/crm/piperun/webhook`
       : null,
+    deployment: {
+      email_outbound_configured: emailOutboundConfigured,
+      inngest_configured: inngestConfigured,
+    },
   });
 }
 
@@ -425,36 +403,6 @@ export async function POST(request: Request) {
 
   const role = (await getOrgMemberRole(user.id, orgId)) ?? 'viewer';
 
-  // #region agent log
-  fetch('http://localhost:7298/ingest/81cfdc9b-8f3a-42d7-bcbf-e3113764efc8', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Debug-Session-Id': '497d65',
-    },
-    body: JSON.stringify({
-      sessionId: '497d65',
-      runId: 'pre-fix',
-      hypothesisId: 'H4',
-      location: 'src/app/api/settings/route.ts:421-429',
-      message: 'POST /api/settings role resolvida',
-      data: { userId: user.id, orgId, role },
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-  appendFile(
-    '/home/ubuntu/rfy/.cursor/debug-497d65.log',
-    JSON.stringify({
-      sessionId: '497d65',
-      runId: 'pre-fix',
-      hypothesisId: 'H4',
-      location: 'src/app/api/settings/route.ts:421-429',
-      message: 'POST /api/settings role resolvida',
-      data: { userId: user.id, orgId, role },
-      timestamp: Date.now(),
-    }) + '\n'
-  ).catch(() => {});
-  // #endregion
   const bodySchema = z.object({
     section: z.string().min(1, 'section é obrigatória'),
     data: z.record(z.string(), z.unknown()).optional().default({}),

@@ -3,7 +3,7 @@ import {
   createUser,
   createSession,
   getSessionCookieName,
-  getSessionAgeMs,
+  getSessionCookieOptions,
 } from '@/lib/auth-session';
 import { provisionOrgOnFirstLogin } from '@/lib/auth';
 
@@ -33,13 +33,7 @@ export async function POST(request: NextRequest) {
 
     const next = request.nextUrl.searchParams.get('next') ?? '/app/dashboard';
     const res = NextResponse.json({ ok: true, next });
-    res.cookies.set(getSessionCookieName(), sessionId, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/',
-      maxAge: Math.floor(getSessionAgeMs() / 1000),
-    });
+    res.cookies.set(getSessionCookieName(), sessionId, getSessionCookieOptions());
     return res;
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Erro ao criar conta';

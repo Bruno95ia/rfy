@@ -4,8 +4,7 @@
  */
 
 import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
-import { appendFile } from 'node:fs/promises';
-import { getPool, query, queryOne } from '@/lib/db';
+import { getPool, queryOne } from '@/lib/db';
 
 const SESSION_COOKIE = 'rfy_session';
 const SESSION_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 dias
@@ -45,20 +44,6 @@ export async function createUser(email: string, password: string): Promise<AppUs
     [normalized, passwordHash]
   );
   if (rows.length === 0) {
-    // #region agent log
-    appendFile(
-      '/home/ubuntu/rfy/.cursor/debug-497d65.log',
-      JSON.stringify({
-        sessionId: '497d65',
-        runId: 'pre-fix',
-        hypothesisId: 'L1',
-        location: 'src/lib/auth-session.ts:46-48',
-        message: 'createUser não inseriu linha (email já cadastrado?)',
-        data: { email: normalized },
-        timestamp: Date.now(),
-      }) + '\n'
-    ).catch(() => {});
-    // #endregion
     throw new Error('Este e-mail já está cadastrado.');
   }
   return { id: rows[0].id, email: rows[0].email };
@@ -88,26 +73,6 @@ export async function verifyLogin(email: string, password: string): Promise<AppU
     row.is_active &&
     verifyPassword(row.password_hash, password);
 
-  // #region agent log
-  appendFile(
-    '/home/ubuntu/rfy/.cursor/debug-497d65.log',
-    JSON.stringify({
-      sessionId: '497d65',
-      runId: 'pre-fix',
-      hypothesisId: 'L2',
-      location: 'src/lib/auth-session.ts:61-72',
-      message: 'verifyLogin resultado',
-      data: {
-        email: email.trim().toLowerCase(),
-        found: !!row,
-        is_active: row?.is_active ?? null,
-        ok,
-      },
-      timestamp: Date.now(),
-    }) + '\n'
-  ).catch(() => {});
-  // #endregion
-
   if (!ok) return null;
   return { id: row.id, email: row.email };
 }
@@ -120,53 +85,28 @@ export async function createSession(userId: string): Promise<string> {
     [userId, expiresAt.toISOString()]
   );
   if (rows.length === 0) {
-    // #region agent log
-    appendFile(
-      '/home/ubuntu/rfy/.cursor/debug-497d65.log',
-      JSON.stringify({
-        sessionId: '497d65',
-        runId: 'pre-fix',
-        hypothesisId: 'L3',
-        location: 'src/lib/auth-session.ts:75-83',
-        message: 'Falha ao criar sessão: insert não retornou linhas',
-        data: { userId },
-        timestamp: Date.now(),
-      }) + '\n'
-    ).catch(() => {});
-    // #endregion
     throw new Error('Falha ao criar sessão');
   }
-
-  // #region agent log
-  appendFile(
-    '/home/ubuntu/rfy/.cursor/debug-497d65.log',
-    JSON.stringify({
-      sessionId: '497d65',
-      runId: 'pre-fix',
-      hypothesisId: 'L4',
-      location: 'src/lib/auth-session.ts:75-83',
-      message: 'Sessão criada com sucesso',
-      data: { userId, sessionId: rows[0].id },
-      timestamp: Date.now(),
-    }) + '\n'
-  ).catch(() => {});
-  // #endregion
 
   return rows[0].id;
 }
 
 export async function getSessionUser(sessionId: string | null): Promise<AppUser | null> {
   if (!sessionId || sessionId.length < 30) return null;
-  const now = new Date().toISOString();
-  const row = await queryOne<{ user_id: string; email: string; is_active: boolean }>(
-    `SELECT s.user_id, u.email, u.is_active
-     FROM app_sessions s
-     JOIN app_users u ON u.id = s.user_id
-     WHERE s.id = $1 AND s.expires_at > $2`,
-    [sessionId, now]
-  );
-  if (!row || !row.is_active) return null;
-  return { id: row.user_id, email: row.email };
+  try {
+    const now = new Date().toISOString();
+    const row = await queryOne<{ user_id: string; email: string; is_active: boolean }>(
+      `SELECT s.user_id, u.email, u.is_active
+       FROM app_sessions s
+       JOIN app_users u ON u.id = s.user_id
+       WHERE s.id = $1 AND s.expires_at > $2`,
+      [sessionId, now]
+    );
+    if (!row || !row.is_active) return null;
+    return { id: row.user_id, email: row.email };
+  } catch {
+    return null;
+  }
 }
 
 export async function deleteSession(sessionId: string): Promise<void> {
@@ -180,6 +120,19 @@ export function getSessionCookieName(): string {
 
 export function getSessionAgeMs(): number {
   return SESSION_AGE_MS;
+}
+
+/** Opções do cookie de sessão. secure só quando a app é servida via HTTPS. */
+export function getSessionCookieOptions(): { httpOnly: boolean; secure: boolean; sameSite: 'lax'; path: string; maxAge: number } {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? '';
+  const secure = process.env.NODE_ENV === 'production' && appUrl.startsWith('https://');
+  return {
+    httpOnly: true,
+    secure,
+    sameSite: 'lax',
+    path: '/',
+    maxAge: Math.floor(SESSION_AGE_MS / 1000),
+  };
 }
 
 /** No servidor Next: obtém o usuário atual a partir do cookie de sessão. */

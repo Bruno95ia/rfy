@@ -34,17 +34,19 @@ export async function PATCH(
     return NextResponse.json({ error: 'Ritual não encontrado' }, { status: 404 });
   }
 
-  const updates: { conducted_at?: string; notes?: string } = {};
-  if (conductedAt !== undefined) updates.conducted_at = conductedAt || null;
-  if (notes !== undefined) updates.notes = notes ?? null;
+const updates: { conducted_at?: string | null; notes?: string | null } = {};
+   if (conductedAt !== undefined) updates.conducted_at = conductedAt || null;
+   if (notes !== undefined) updates.notes = notes ?? null;
+
+  const updateRes = await admin.from('supho_rituals').update(updates).eq('id', id);
+  if (updateRes.error) return NextResponse.json({ error: updateRes.error.message }, { status: 500 });
 
   const { data, error } = await admin
     .from('supho_rituals')
-    .update(updates)
-    .eq('id', id)
     .select('id, template_id, scheduled_at, conducted_at, notes, created_at')
-    .single();
+    .eq('id', id)
+    .maybeSingle();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error || !data) return NextResponse.json({ error: 'Ritual não encontrado' }, { status: 500 });
   return NextResponse.json(data);
 }

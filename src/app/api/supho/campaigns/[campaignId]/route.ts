@@ -39,12 +39,14 @@ export async function PATCH(
   if (question_ids !== undefined) {
     if (question_ids !== null && question_ids.length > 0) {
       const uniqueIds = [...new Set(question_ids)];
-      const { data: allowed } = await admin
-        .from('supho_questions')
-        .select('id')
-        .or(`org_id.is.null,org_id.eq.${access.campaign.org_id}`)
-        .in('id', uniqueIds);
-      const allowedIds = new Set((allowed ?? []).map((r) => r.id));
+      const [globals, orgQuestions] = await Promise.all([
+        admin.from('supho_questions').select('id').is('org_id', null).in('id', uniqueIds),
+        admin.from('supho_questions').select('id').eq('org_id', access.campaign.org_id).in('id', uniqueIds),
+      ]);
+      const allowedIds = new Set([
+        ...((globals.data ?? []).map((r) => (r as { id: string }).id)),
+        ...((orgQuestions.data ?? []).map((r) => (r as { id: string }).id)),
+      ]);
       const invalid = uniqueIds.filter((id) => !allowedIds.has(id));
       if (invalid.length > 0) {
         return NextResponse.json(
@@ -63,13 +65,19 @@ export async function PATCH(
     return NextResponse.json({ ok: true });
   }
 
-  const { data, error } = await admin
+  const updateRes = await admin
     .from('supho_diagnostic_campaigns')
     .update(updates)
-    .eq('id', campaignId)
-    .select('id, name, status, question_ids')
-    .single();
+    .eq('id', campaignId);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (updateRes.error) return NextResponse.json({ error: updateRes.error.message }, { status: 500 });
+
+  const { data, error } = await admin
+    .from('supho_diagnostic_campaigns')
+    .select('id, name, status, question_ids')
+    .eq('id', campaignId)
+    .maybeSingle();
+
+  if (error || !data) return NextResponse.json({ error: 'Campanha não encontrada' }, { status: 404 });
   return NextResponse.json(data);
 }

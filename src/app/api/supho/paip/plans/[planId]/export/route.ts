@@ -28,7 +28,7 @@ export async function GET(
     .eq('plan_id', planId)
     .order('created_at');
 
-  const gapIds = (gaps ?? []).map((g: { id: string }) => g.id);
+  const gapIds = (gaps ?? []).map((g) => (g as { id: string }).id);
   const { data: objectives } = gapIds.length > 0
     ? await admin
         .from('supho_paip_objectives')
@@ -37,23 +37,29 @@ export async function GET(
         .order('created_at')
     : { data: [] };
 
-  const objectiveIds = (objectives ?? []).map((o: { id: string }) => o.id);
+  const objectiveIds = (objectives ?? []).map((o) => (o as { id: string }).id);
   const { data: krs } = objectiveIds.length > 0
     ? await admin.from('supho_paip_krs').select('id, objective_id, kr_text, target_value').in('objective_id', objectiveIds).order('created_at')
     : { data: [] };
 
-  const krIds = (krs ?? []).map((k: { id: string }) => k.id);
+  const krIds = (krs ?? []).map((k) => (k as { id: string }).id);
   const { data: actions } = krIds.length > 0
     ? await admin.from('supho_paip_actions').select('id, kr_id, action_5w2h, owner_id, due_at, status').in('kr_id', krIds).order('due_at')
     : { data: [] };
 
-  const objectivesWithKrs = (objectives ?? []).map((obj: { id: string; gap_id: string; objective_text: string }) => ({
-    ...obj,
-    krs: (krs ?? []).filter((k: { objective_id: string }) => k.objective_id === obj.id).map((k: { id: string; kr_text: string; target_value: string | null }) => ({
-      ...k,
-      actions: (actions ?? []).filter((a: { kr_id: string }) => a.kr_id === k.id),
-    })),
-  }));
+  const objectivesWithKrs = (objectives ?? []).map((obj) => {
+    const o = obj as { id: string; gap_id: string; objective_text: string };
+    return {
+    ...o,
+    krs: (krs ?? []).filter((k) => (k as { objective_id: string }).objective_id === o.id).map((k) => {
+      const kr = k as { id: string; kr_text: string; target_value: string | null };
+      return {
+        ...kr,
+        actions: (actions ?? []).filter((a) => (a as { kr_id: string }).kr_id === kr.id),
+      };
+    }),
+  };
+  });
 
   const html = `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -74,15 +80,15 @@ export async function GET(
   <h1>${plan.name}</h1>
   <p class="meta">Status: ${plan.status} | Período: ${plan.period_start ?? '—'} a ${plan.period_end ?? '—'} | Exportado em ${new Date().toLocaleString('pt-BR')}</p>
   <h2>Gaps</h2>
-  ${(gaps ?? []).length ? `<ul>${(gaps ?? []).map((g: { description: string | null }) => `<li>${g.description ?? '—'}</li>`).join('')}</ul>` : '<p>Nenhum gap registrado.</p>'}
+  ${(gaps ?? []).length ? `<ul>${(gaps ?? []).map((g) => `<li>${(g as { description: string | null }).description ?? '—'}</li>`).join('')}</ul>` : '<p>Nenhum gap registrado.</p>'}
   <h2>Objetivos, KRs e Ações</h2>
-  ${objectivesWithKrs.map((obj: { objective_text: string; krs: Array<{ kr_text: string; target_value: string | null; actions: Array<{ action_5w2h: string | null; owner_id: string | null; due_at: string | null; status: string }> }> }) => `
+  ${objectivesWithKrs.map((obj) => `
   <div class="obj">
     <strong>${obj.objective_text}</strong>
-    ${obj.krs.map((kr: { kr_text: string; target_value: string | null; actions: Array<{ action_5w2h: string | null; owner_id: string | null; due_at: string | null; status: string }> }) => `
+    ${obj.krs.map((kr) => `
     <div class="kr">
       <strong>KR:</strong> ${kr.kr_text}${kr.target_value != null ? ` (${kr.target_value})` : ''}
-      ${kr.actions.length ? `<ul>${kr.actions.map((a: { action_5w2h: string | null; owner_id: string | null; due_at: string | null; status: string }) => `<li>${a.action_5w2h ?? '—'} ${a.due_at ? `— ${a.due_at}` : ''} [${a.status}]</li>`).join('')}</ul>` : ''}
+      ${kr.actions.length ? `<ul>${kr.actions.map((a) => `<li>${a.action_5w2h ?? '—'} ${a.due_at ? `— ${a.due_at}` : ''} [${a.status}]</li>`).join('')}</ul>` : ''}
     </div>
     `).join('')}
   </div>

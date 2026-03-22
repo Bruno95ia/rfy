@@ -101,7 +101,8 @@ export function AIStatusCard({
             ) : (
               <span className="inline-flex items-center gap-1.5 rounded-lg bg-amber-50 px-2.5 py-1 text-sm font-medium text-amber-800">
                 <AlertCircle className="h-4 w-4" />
-                {status?.error ?? 'Serviço indisponível'}
+                Análise AI indisponível
+                {status?.error ? ` — ${status.error}` : ''}
               </span>
             )}
             {lastModel && (

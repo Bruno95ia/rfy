@@ -3,7 +3,7 @@ import {
   createUser,
   createSession,
   getSessionCookieName,
-  getSessionAgeMs,
+  getSessionCookieOptions,
   getUserByEmail,
 } from '@/lib/auth-session';
 import { provisionOrgOnFirstLogin } from '@/lib/auth';
@@ -40,13 +40,7 @@ export async function GET(_req: NextRequest) {
     await provisionOrgOnFirstLogin(user.id);
 
     const res = NextResponse.redirect(new URL('/app/dashboard', process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'));
-    res.cookies.set(getSessionCookieName(), sessionId, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/',
-      maxAge: Math.floor(getSessionAgeMs() / 1000),
-    });
+    res.cookies.set(getSessionCookieName(), sessionId, getSessionCookieOptions());
     return res;
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Erro ao criar sessão demo';

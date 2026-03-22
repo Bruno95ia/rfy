@@ -6,7 +6,9 @@
     "dev": "next dev -p 3000",
     "dev:local": "next dev -p 3001",
     "build": "next build",
+    "postbuild": "bash -c '([ -d .next/static ] && [ -d .next/standalone/.next ]) && cp -r .next/static .next/standalone/.next/; ([ -d public ]) && cp -r public .next/standalone/ 2>/dev/null; true'",
     "start": "next start",
+    "start:standalone": "bash scripts/start-standalone.sh",
     "lint": "eslint src",
     "test": "vitest run --coverage",
     "test:watch": "vitest",
@@ -23,7 +25,8 @@
     "db:migrate:supho": "bash scripts/apply-migration-007.sh",
     "db:migrate:supho-questions": "bash scripts/apply-migration-008.sh",
     "db:seed:admin": "node scripts/create-demo-admin.js",
-    "supabase:local": "bash scripts/supabase-local-dev.sh"
+    "supabase:local": "bash scripts/supabase-local-dev.sh",
+    "audit:smoke": "bash scripts/audit-smoke.sh"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",

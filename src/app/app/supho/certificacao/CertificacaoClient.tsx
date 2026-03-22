@@ -43,7 +43,10 @@ export function CertificacaoClient() {
 
   const loadEvidences = useCallback(async (runId: string) => {
     const res = await fetch(`/api/supho/certification/runs/${runId}/evidences`);
-    if (res.ok) setEvidencesByRun((prev) => ({ ...prev, [runId]: await res.json() }));
+    if (res.ok) {
+      const data = await res.json();
+      setEvidencesByRun((prev) => ({ ...prev, [runId]: data }));
+    }
   }, []);
 
   const handleCreateRun = async () => {

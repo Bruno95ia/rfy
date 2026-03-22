@@ -60,7 +60,7 @@ async function ensureSubscription(
     plan_id: 'starter',
     status: 'active',
   };
-  await admin.from('org_subscriptions').upsert(fallback, {
+  await admin.from('org_subscriptions').upsert(fallback as unknown as Record<string, unknown>, {
     onConflict: 'org_id',
     ignoreDuplicates: false,
   });

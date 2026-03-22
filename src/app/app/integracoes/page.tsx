@@ -7,6 +7,13 @@ import Link from 'next/link';
 
 const CONNECTORS = [
   { id: 'piperun', name: 'PipeRun', description: 'Exportação CSV (atual)', status: 'active', href: '/app/uploads' },
+  {
+    id: 'supho-externo',
+    name: 'SUPHO (formulários externos)',
+    description: 'Importar CSV/JSON de respostas de diagnóstico vindas de outras ferramentas',
+    status: 'active',
+    href: '/app/uploads#supho-externo',
+  },
   { id: 'pipedrive', name: 'Pipedrive', description: 'API REST', status: 'coming', href: null },
   { id: 'hubspot', name: 'HubSpot', description: 'API REST', status: 'coming', href: null },
   { id: 'salesforce', name: 'Salesforce', description: 'API REST', status: 'coming', href: null },

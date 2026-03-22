@@ -1,8 +1,8 @@
 'use client';
 
-import { Suspense, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { ArrowRight, CheckCircle2, Undo2 } from 'lucide-react';
 import { Logo } from '@/components/ui/Logo';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,12 +13,19 @@ import { Badge } from '@/components/ui/badge';
 
 function SignupContent() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const inviteToken = searchParams.get('invite');
+  const [inviteToken, setInviteToken] = useState<string | null>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    try {
+      setInviteToken(new URLSearchParams(window.location.search).get('invite'));
+    } catch {
+      setInviteToken(null);
+    }
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -152,13 +159,5 @@ function SignupContent() {
 }
 
 export default function SignupPage() {
-  return (
-    <Suspense fallback={
-      <main className="flex min-h-screen items-center justify-center px-4">
-        <div className="text-sm text-[var(--color-text-muted)]">Carregando...</div>
-      </main>
-    }>
-      <SignupContent />
-    </Suspense>
-  );
+  return <SignupContent />;
 }

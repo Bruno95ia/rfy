@@ -6,15 +6,34 @@ export default function UploadsLoading() {
   return (
     <div className="space-y-8">
       <PageHeader
+        breadcrumbs={[{ label: 'App', href: '/app/dashboard' }, { label: 'Uploads' }]}
         title="Uploads"
         subtitle={<Skeleton className="h-4 w-72" />}
       />
+      <Card>
+        <CardHeader>
+          <Skeleton className="h-5 w-56" />
+          <Skeleton className="mt-2 h-4 w-full max-w-xl" />
+        </CardHeader>
+        <CardContent>
+          <Skeleton className="h-24 w-full" />
+        </CardContent>
+      </Card>
       <Card>
         <CardContent className="pt-6">
           <div className="space-y-4">
             <Skeleton className="h-4 w-24" />
             <Skeleton className="h-32 w-full" />
           </div>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <Skeleton className="h-5 w-64" />
+          <Skeleton className="mt-2 h-4 w-full max-w-xl" />
+        </CardHeader>
+        <CardContent>
+          <Skeleton className="h-28 w-full" />
         </CardContent>
       </Card>
       <Card>

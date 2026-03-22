@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
+import { createAdminClient, type DeleteResult } from '@/lib/supabase/admin';
 import { requireApiAuth, getOrgIdForUser, userHasMinimumOrgRole } from '@/lib/auth';
 
 export async function POST(req: NextRequest) {
@@ -28,12 +28,9 @@ export async function POST(req: NextRequest) {
   }
 
   const admin = createAdminClient();
-  let query = admin.from('form_invites').delete();
-  if (formSlug) {
-    query = query.eq('form_slug', formSlug);
-  }
-
-  const { error } = await query;
+  const base = admin.from('form_invites').delete();
+  const query = formSlug ? base.eq('form_slug', formSlug) : base;
+  const { error } = (await query) as DeleteResult;
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

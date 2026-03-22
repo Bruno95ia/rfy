@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { createAdminClient } from '@/lib/supabase/admin';
+import { createAdminClient, type UpdateResult, type DeleteResult } from '@/lib/supabase/admin';
 import { requirePlatformAdminApi } from '@/lib/auth';
 
 const updateUserSchema = z.object({
@@ -62,27 +62,28 @@ export async function POST(req: NextRequest) {
 
   if (action === 'activate' || action === 'deactivate') {
     const isActive = action === 'activate';
-    const updateRes = await admin
+    const updateRes: UpdateResult = await admin
       .from('app_users')
       .update({ is_active: isActive })
-      .eq('id', user_id)
-      .select('id')
-      .maybeSingle();
-
+      .eq('id', user_id);
     if (updateRes.error) {
       return NextResponse.json({ error: updateRes.error.message }, { status: 500 });
     }
-    if (!updateRes.data) {
+
+    const check = await admin.from('app_users').select('id').eq('id', user_id).maybeSingle();
+    if (check.error) {
+      return NextResponse.json({ error: check.error.message }, { status: 500 });
+    }
+    if (!check.data) {
       return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 });
     }
 
     // Se desativar, derruba sessões atuais do usuário.
     if (!isActive) {
-      const delRes = await new Promise<{ data: null; error: { message: string } | null }>(
-        (resolve) => {
-          admin.from('app_sessions').delete().eq('user_id', user_id).then(resolve);
-        }
-      );
+      const delRes: DeleteResult = await admin
+        .from('app_sessions')
+        .delete()
+        .eq('user_id', user_id);
       if (delRes.error) {
         return NextResponse.json(
           { error: 'Falha ao encerrar sessões do usuário: ' + delRes.error.message },
@@ -96,17 +97,19 @@ export async function POST(req: NextRequest) {
 
   if (action === 'make_admin' || action === 'remove_admin') {
     const isAdmin = action === 'make_admin';
-    const updateRes = await admin
+    const updateRes: UpdateResult = await admin
       .from('app_users')
       .update({ is_platform_admin: isAdmin })
-      .eq('id', user_id)
-      .select('id')
-      .maybeSingle();
-
+      .eq('id', user_id);
     if (updateRes.error) {
       return NextResponse.json({ error: updateRes.error.message }, { status: 500 });
     }
-    if (!updateRes.data) {
+
+    const check = await admin.from('app_users').select('id').eq('id', user_id).maybeSingle();
+    if (check.error) {
+      return NextResponse.json({ error: check.error.message }, { status: 500 });
+    }
+    if (!check.data) {
       return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 });
     }
     return NextResponse.json({ ok: true });

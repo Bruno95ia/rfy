@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Loader2, BarChart3, Briefcase, Lightbulb } from 'lucide-react';
+import { Loader2, BarChart3, Briefcase, Lightbulb, AlertCircle } from 'lucide-react';
+import { getAIStatus, type AIStatusResponse } from '@/lib/aiClient';
 
 export function AIClient({ orgId }: { orgId: string }) {
   const [benchmarkLoading, setBenchmarkLoading] = useState(false);
@@ -15,6 +16,33 @@ export function AIClient({ orgId }: { orgId: string }) {
   const [interventionsLoading, setInterventionsLoading] = useState(false);
   const [interventions, setInterventions] = useState<unknown[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [aiStatus, setAiStatus] = useState<AIStatusResponse | null>(null);
+  const [aiStatusLoading, setAiStatusLoading] = useState(true);
+
+  const loadAiAvailability = useCallback(async () => {
+    if (!orgId) return;
+    setAiStatusLoading(true);
+    try {
+      const data = await getAIStatus(orgId);
+      setAiStatus(data);
+    } catch {
+      setAiStatus({
+        health: 'unavailable',
+        models: [],
+        models_available: false,
+        error: 'Não foi possível contactar o serviço de IA',
+      });
+    } finally {
+      setAiStatusLoading(false);
+    }
+  }, [orgId]);
+
+  useEffect(() => {
+    void loadAiAvailability();
+  }, [loadAiAvailability]);
+
+  /** Alinhado a GET /api/ai/status: `health === 'ok'` quando o AI Service responde em condições. */
+  const aiReady = aiStatus?.health === 'ok';
 
   const runBenchmark = async () => {
     if (!orgId) return;
@@ -81,6 +109,28 @@ export function AIClient({ orgId }: { orgId: string }) {
 
   return (
     <div className="space-y-6">
+      {!aiStatusLoading && !aiReady && (
+        <div
+          className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950"
+          role="status"
+        >
+          <div className="flex gap-2">
+            <AlertCircle className="h-5 w-5 shrink-0 text-amber-700" aria-hidden />
+            <div>
+              <p className="font-medium">Análise AI indisponível</p>
+              <p className="mt-1 text-amber-900/90">
+                O serviço de IA (previsões, benchmark, intervenções) não está acessível ou não respondeu a tempo.
+                Confirme que <code className="rounded bg-amber-100/80 px-1">AI_SERVICE_URL</code> aponta para o
+                serviço correto e que o processo está em execução. Os restantes módulos do RFY não dependem disto.
+              </p>
+              {aiStatus?.error && (
+                <p className="mt-2 font-mono text-xs text-amber-900/80">{aiStatus.error}</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {error && <p className="text-sm text-red-600">{error}</p>}
 
       <Card className="border-[var(--color-border)]">
@@ -91,7 +141,7 @@ export function AIClient({ orgId }: { orgId: string }) {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <Button onClick={runBenchmark} disabled={benchmarkLoading || !orgId}>
+          <Button onClick={runBenchmark} disabled={benchmarkLoading || !orgId || !aiReady}>
             {benchmarkLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             Executar benchmark
           </Button>
@@ -117,7 +167,7 @@ export function AIClient({ orgId }: { orgId: string }) {
             onChange={(e) => setDealId(e.target.value)}
             className="max-w-xs"
           />
-          <Button onClick={runDeal} disabled={dealLoading || !orgId || !dealId.trim()}>
+          <Button onClick={runDeal} disabled={dealLoading || !orgId || !dealId.trim() || !aiReady}>
             {dealLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             Analisar deal
           </Button>
@@ -137,7 +187,7 @@ export function AIClient({ orgId }: { orgId: string }) {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <Button onClick={runInterventions} disabled={interventionsLoading || !orgId}>
+          <Button onClick={runInterventions} disabled={interventionsLoading || !orgId || !aiReady}>
             {interventionsLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             Carregar intervenções
           </Button>

@@ -19,10 +19,12 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
+  // Reutiliza servidor já em :3000 (evita "port already in use" em CI ou host com app ativa).
+  // Para forçar um servidor novo: pare o processo na porta ou use outra URL com E2E_BASE_URL.
   webServer: {
     command: 'npm run dev',
     url: 'http://127.0.0.1:3000',
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: true,
     timeout: 120_000,
   },
 });

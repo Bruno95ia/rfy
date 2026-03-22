@@ -15,7 +15,7 @@ export async function GET() {
     .from('supho_ritual_templates')
     .select('id')
     .eq('org_id', auth.orgId);
-  const templateIds = (templateRows ?? []).map((t: { id: string }) => t.id);
+  const templateIds = (templateRows ?? []).map((t) => (t as { id: string }).id);
   if (templateIds.length === 0) {
     return NextResponse.json({
       score: 0,
@@ -38,10 +38,10 @@ export async function GET() {
     .gte('scheduled_at', since.toISOString());
 
   const totalRituais = rituals?.length ?? 0;
-  const realizados = (rituals ?? []).filter((r: { conducted_at: string | null }) => r.conducted_at != null).length;
+  const realizados = (rituals ?? []).filter((r) => (r as { conducted_at: string | null }).conducted_at != null).length;
   const assiduidadePct = totalRituais > 0 ? Math.round((realizados / totalRituais) * 100) : 0;
 
-  const ritualIds = (rituals ?? []).map((r: { id: string }) => r.id);
+  const ritualIds = (rituals ?? []).map((r) => (r as { id: string }).id);
   let totalDecisoes = 0;
   let decisoesConcluidas = 0;
 
@@ -51,7 +51,7 @@ export async function GET() {
       .select('status')
       .in('ritual_id', ritualIds);
     totalDecisoes = decisions?.length ?? 0;
-    decisoesConcluidas = (decisions ?? []).filter((d: { status: string }) => d.status === 'done').length;
+    decisoesConcluidas = (decisions ?? []).filter((d) => (d as { status: string }).status === 'done').length;
   }
 
   const execucaoPct = totalDecisoes > 0 ? Math.round((decisoesConcluidas / totalDecisoes) * 100) : 100;

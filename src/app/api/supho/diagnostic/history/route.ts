@@ -18,11 +18,11 @@ export async function GET() {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   const rows = data ?? [];
-  const campaignIds = [...new Set(rows.map((r: { campaign_id: string }) => r.campaign_id))];
+  const campaignIds = [...new Set(rows.map((r) => (r as { campaign_id: string }).campaign_id))];
   const { data: campaigns } = campaignIds.length > 0
     ? await admin.from('supho_diagnostic_campaigns').select('id, name').in('id', campaignIds)
     : { data: [] };
-  const nameByCampaign = new Map((campaigns ?? []).map((c: { id: string; name: string }) => [c.id, c.name]));
+  const nameByCampaign = new Map((campaigns ?? []).map((c) => [(c as { id: string; name: string }).id, (c as { id: string; name: string }).name]));
 
   const result = rows.map((r: Record<string, unknown>) => ({
     id: r.id,

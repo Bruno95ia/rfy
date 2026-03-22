@@ -64,13 +64,17 @@ export async function POST(
     .maybeSingle();
 
   if (existing?.id) {
-    const { data: updated, error: updateErr } = await admin
+    const updateRes = await admin
       .from('supho_certification_evidences')
       .update({ score, evidence_url: evidenceUrl, notes })
-      .eq('id', existing.id)
+      .eq('id', existing.id);
+    if (updateRes.error) return NextResponse.json({ error: updateRes.error.message }, { status: 500 });
+    const { data: updated, error: updateErr } = await admin
+      .from('supho_certification_evidences')
       .select('id, criterion_id, score, evidence_url, notes, created_at')
-      .single();
-    if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 });
+      .eq('id', existing.id)
+      .maybeSingle();
+    if (updateErr || !updated) return NextResponse.json({ error: 'Evidência não encontrada' }, { status: 500 });
     return NextResponse.json(updated);
   }
 

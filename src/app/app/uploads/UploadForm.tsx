@@ -6,6 +6,7 @@ import { Database, FileSpreadsheet, ListChecks } from 'lucide-react';
 import { UploadDropzone } from '@/components/UploadDropzone';
 import { useToast } from '@/components/ui/use-toast';
 import { Badge } from '@/components/ui/badge';
+import { UsageLimitsHint, useUploadLimitGate } from './UsageLimitsHint';
 
 type Kind = 'opportunities' | 'activities';
 
@@ -17,6 +18,7 @@ export function UploadForm({ orgId }: UploadFormProps) {
   const [kind, setKind] = useState<Kind>('opportunities');
   const router = useRouter();
   const { toast } = useToast();
+  const { blocked: uploadBlocked, refresh: refreshLimits } = useUploadLimitGate();
 
   async function handleUpload(file: File, uploadKind: Kind) {
     const formData = new FormData();
@@ -38,11 +40,13 @@ export function UploadForm({ orgId }: UploadFormProps) {
       description: `Arquivo "${file.name}" enviado com sucesso. Processando...`,
       variant: 'success',
     });
+    refreshLimits();
     router.refresh();
   }
 
   return (
     <div className="space-y-6">
+      <UsageLimitsHint />
       <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-slate-50/60 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-sm font-medium text-slate-900">
@@ -83,7 +87,7 @@ export function UploadForm({ orgId }: UploadFormProps) {
         </div>
       </div>
 
-      <UploadDropzone kind={kind} onUpload={handleUpload} />
+      <UploadDropzone kind={kind} onUpload={handleUpload} disabled={uploadBlocked} />
     </div>
   );
 }

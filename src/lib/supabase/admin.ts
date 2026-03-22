@@ -4,4 +4,4 @@
  */
 
 export { createAdminClient } from '@/lib/db/admin';
-export type { DbError, AdminDbClientType } from '@/lib/db/admin';
+export type { DbError, AdminDbClientType, UpdateResult, DeleteResult } from '@/lib/db/admin';

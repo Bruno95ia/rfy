@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
+import { UsageLimitsHint, useUploadLimitGate } from './UsageLimitsHint';
 
 interface DemoPackFormProps {
   orgId: string;
@@ -25,6 +26,7 @@ export function DemoPackForm({ orgId }: DemoPackFormProps) {
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const { toast } = useToast();
+  const { blocked: uploadBlocked, refresh: refreshLimits } = useUploadLimitGate(2);
 
   const MAX_MB = 50;
   const maxBytes = MAX_MB * 1024 * 1024;
@@ -60,6 +62,7 @@ export function DemoPackForm({ orgId }: DemoPackFormProps) {
       });
       setFileOpp(null);
       setFileAct(null);
+      refreshLimits();
       router.refresh();
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Erro ao enviar';
@@ -76,6 +79,7 @@ export function DemoPackForm({ orgId }: DemoPackFormProps) {
 
   return (
     <div className="space-y-6">
+      <UsageLimitsHint />
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-sm font-medium text-slate-900">
@@ -116,7 +120,7 @@ export function DemoPackForm({ orgId }: DemoPackFormProps) {
               accept=".csv,text/csv,application/csv,text/plain"
               className="text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-indigo-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-indigo-700"
               onChange={(e) => setFileOpp(e.target.files?.[0] ?? null)}
-              disabled={loading}
+              disabled={loading || uploadBlocked}
             />
             {fileOpp && (
               <span className="flex items-center gap-1.5 text-xs text-slate-500">
@@ -134,7 +138,7 @@ export function DemoPackForm({ orgId }: DemoPackFormProps) {
               accept=".csv,text/csv,application/csv,text/plain"
               className="text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-indigo-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-indigo-700"
               onChange={(e) => setFileAct(e.target.files?.[0] ?? null)}
-              disabled={loading}
+              disabled={loading || uploadBlocked}
             />
             {fileAct && (
               <span className="flex items-center gap-1.5 text-xs text-slate-500">
@@ -155,7 +159,7 @@ export function DemoPackForm({ orgId }: DemoPackFormProps) {
         <div className="flex flex-wrap items-center gap-3">
           <Button
             type="submit"
-            disabled={!canSubmit}
+            disabled={!canSubmit || uploadBlocked}
             className="gap-2 bg-indigo-600 hover:bg-indigo-700"
           >
             {loading ? (

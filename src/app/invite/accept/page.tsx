@@ -10,16 +10,18 @@ import { Button } from '@/components/ui/button';
 function InviteAcceptContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const token = searchParams.get('token');
-  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
-  const [message, setMessage] = useState<string>('');
+  const tokenParam = searchParams.get('token');
+  const token = tokenParam?.trim() ?? '';
+
+  const [status, setStatus] = useState<'loading' | 'success' | 'error'>(() =>
+    token ? 'loading' : 'error'
+  );
+  const [message, setMessage] = useState(() =>
+    token ? '' : 'Link de convite inválido ou ausente.'
+  );
 
   useEffect(() => {
-    if (!token?.trim()) {
-      setStatus('error');
-      setMessage('Link de convite inválido ou ausente.');
-      return;
-    }
+    if (!token) return;
 
     const run = async () => {
       // Verifica se está logado via cookie (a API de accept exige auth)
@@ -90,13 +92,17 @@ function InviteAcceptContent() {
   );
 }
 
+function InviteFallback() {
+  return (
+    <main className="min-h-screen flex items-center justify-center px-4 py-8">
+      <Loader2 className="h-10 w-10 animate-spin text-[var(--color-primary)]" aria-hidden />
+    </main>
+  );
+}
+
 export default function InviteAcceptPage() {
   return (
-    <Suspense fallback={
-      <main className="flex min-h-screen items-center justify-center px-4">
-        <div className="text-sm text-[var(--color-text-muted)]">Carregando...</div>
-      </main>
-    }>
+    <Suspense fallback={<InviteFallback />}>
       <InviteAcceptContent />
     </Suspense>
   );

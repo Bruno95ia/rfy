@@ -11,11 +11,15 @@ export function ThemeToggle() {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
-    const stored = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
-    const isDark = stored === 'dark' || (!stored && window.matchMedia('(prefers-color-scheme: dark)').matches);
-    setDark(isDark);
-    document.documentElement.classList.toggle('dark', isDark);
+    const id = requestAnimationFrame(() => {
+      const stored = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
+      const isDark =
+        stored === 'dark' || (!stored && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      setDark(isDark);
+      document.documentElement.classList.toggle('dark', isDark);
+      setMounted(true);
+    });
+    return () => cancelAnimationFrame(id);
   }, []);
 
   const toggle = () => {

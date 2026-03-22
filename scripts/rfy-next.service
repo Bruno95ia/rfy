@@ -1,0 +1,19 @@
+[Unit]
+Description=RFY Next.js (standalone)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/data/apps/rfy
+Environment=NODE_ENV=production
+Environment=PORT=3000
+Environment=NODE_TLS_REJECT_UNAUTHORIZED=0
+ExecStart=/bin/bash /data/apps/rfy/scripts/start-standalone.sh
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -12,8 +12,8 @@ const { Client } = require('pg');
 
 const ROOT = join(__dirname, '..');
 
-function loadEnvLocal() {
-  const path = join(ROOT, '.env.local');
+function loadEnv(file) {
+  const path = join(ROOT, file);
   if (!existsSync(path)) return;
   const content = readFileSync(path, 'utf8');
   for (const line of content.split('\n')) {
@@ -27,7 +27,8 @@ function loadEnvLocal() {
   }
 }
 
-loadEnvLocal();
+loadEnv('.env');
+loadEnv('.env.local');
 
 // DATABASE_URL ou AI_DATABASE_URL (Supabase costuma usar a mesma connection string)
 const DATABASE_URL = process.env.DATABASE_URL
@@ -58,7 +59,11 @@ async function main() {
     process.exit(1);
   }
 
-  const client = new Client({ connectionString: DATABASE_URL });
+  const clientConfig = { connectionString: DATABASE_URL };
+  if (DATABASE_URL.includes('sslmode=require') || DATABASE_URL.includes('ssl=true')) {
+    clientConfig.ssl = { rejectUnauthorized: false };
+  }
+  const client = new Client(clientConfig);
   try {
     await client.connect();
   } catch (e) {

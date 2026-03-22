@@ -2,12 +2,13 @@ import { requireAuth, getOrgIdForUser } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
 import { UploadsList } from './UploadsList';
 import { UploadForm } from './UploadForm';
+import { SuphoExternalImportForm } from './SuphoExternalImportForm';
 import { DemoPackForm } from './DemoPackForm';
 import { UploadsTrack } from './UploadsTrack';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { CheckCircle2, Clock3, AlertTriangle, Package } from 'lucide-react';
+import { CheckCircle2, Clock3, AlertTriangle, Package, ClipboardList } from 'lucide-react';
 
 export default async function UploadsPage() {
   const { user } = await requireAuth();
@@ -79,6 +80,22 @@ export default async function UploadsPage() {
       <Card>
         <CardContent className="pt-6">
           <UploadForm orgId={orgId} />
+        </CardContent>
+      </Card>
+
+      <Card id="supho-externo">
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <ClipboardList className="h-4 w-4 text-indigo-600" />
+            Respostas SUPHO de outras plataformas
+          </CardTitle>
+          <p className="text-sm text-slate-500">
+            Importe CSV ou JSON com respostas coletadas fora da RFY (Typeform, Google Forms, e-mail, etc.). Cada
+            importação cria respondentes e respostas Likert (1–5) na campanha SUPHO escolhida.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <SuphoExternalImportForm orgId={orgId} />
         </CardContent>
       </Card>
 

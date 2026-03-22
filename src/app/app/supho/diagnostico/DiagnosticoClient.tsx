@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ClipboardList, Plus, Users, Calculator, ArrowRight, Loader2, Send, Save } from 'lucide-react';
+import { fetchJsonWithRetry } from '@/lib/supho/fetch-with-retry';
 
 type Campaign = { id: string; name: string; status: string; created_at: string; question_ids?: string[] | null };
 type Question = { id: string; block: string; internal_weight: number; question_text: string | null; item_code: string | null; sort_order: number };
@@ -79,10 +80,18 @@ export function DiagnosticoClient({ orgId, initialCampaigns }: DiagnosticoClient
   const fetchQuestions = useCallback(async () => {
     setQuestionsError(null);
     try {
-      const r = await fetch('/api/supho/questions');
-      const data = await r.json();
-      if (!r.ok) throw new Error((data as { error?: string })?.error || 'Erro ao carregar perguntas');
-      setQuestions(Array.isArray(data) ? data : []);
+      const { res, data } = await fetchJsonWithRetry<unknown[] | { error?: string }>(
+        '/api/supho/questions',
+        undefined,
+        { stepLabel: 'Carregar perguntas do diagnóstico' }
+      );
+      if (!res.ok) {
+        const msg = typeof data === 'object' && data && 'error' in data && typeof (data as { error?: string }).error === 'string'
+          ? (data as { error: string }).error
+          : `HTTP ${res.status}`;
+        throw new Error(`Carregar perguntas: ${msg}`);
+      }
+      setQuestions(Array.isArray(data) ? (data as Question[]) : []);
     } catch (e) {
       setQuestionsError(e instanceof Error ? e.message : 'Erro ao carregar perguntas');
       setQuestions([]);
@@ -123,15 +132,18 @@ export function DiagnosticoClient({ orgId, initialCampaigns }: DiagnosticoClient
     setCreating(true);
     setError(null);
     try {
-      const res = await fetch('/api/supho/campaigns', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, status: 'open' }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || 'Erro ao criar campanha');
-      setCampaigns((prev) => [data, ...prev]);
-      setSelectedCampaignId(data.id);
+      const { res, data } = await fetchJsonWithRetry<Record<string, unknown> & { error?: string }>(
+        '/api/supho/campaigns',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, status: 'open' }),
+        },
+        { stepLabel: 'Criar campanha' }
+      );
+      if (!res.ok) throw new Error(`Criar campanha: ${data?.error ?? `HTTP ${res.status}`}`);
+      setCampaigns((prev) => [data as Campaign, ...prev]);
+      setSelectedCampaignId((data as Campaign).id);
       setNewCampaignName('');
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -145,13 +157,16 @@ export function DiagnosticoClient({ orgId, initialCampaigns }: DiagnosticoClient
     setSavingQuestionSelection(true);
     setError(null);
     try {
-      const res = await fetch(`/api/supho/campaigns/${selectedCampaignId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question_ids: selectedQuestionIds }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || 'Erro ao salvar seleção');
+      const { res, data } = await fetchJsonWithRetry<{ error?: string }>(
+        `/api/supho/campaigns/${selectedCampaignId}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ question_ids: selectedQuestionIds }),
+        },
+        { stepLabel: 'Guardar seleção de perguntas' }
+      );
+      if (!res.ok) throw new Error(`Guardar seleção de perguntas: ${data?.error ?? `HTTP ${res.status}`}`);
       await fetchCampaigns();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -173,24 +188,32 @@ export function DiagnosticoClient({ orgId, initialCampaigns }: DiagnosticoClient
     setLoading(true);
     setError(null);
     try {
-      const resResp = await fetch('/api/supho/respondents', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ campaign_id: selectedCampaignId }),
-      });
-      const respondent = await resResp.json();
-      if (!resResp.ok) throw new Error(respondent?.error || 'Erro ao criar respondente');
+      const { res: resResp, data: respondent } = await fetchJsonWithRetry<{ id: string; error?: string }>(
+        '/api/supho/respondents',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ campaign_id: selectedCampaignId }),
+        },
+        { stepLabel: 'Criar respondente' }
+      );
+      if (!resResp.ok) throw new Error(`Criar respondente: ${respondent?.error ?? `HTTP ${resResp.status}`}`);
 
-      const resAnswers = await fetch('/api/supho/answers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          respondent_id: respondent.id,
-          answers: effectiveQuestions.map((q) => ({ question_id: q.id, value: answers[q.id] ?? 3 })),
-        }),
-      });
-      const ansData = await resAnswers.json();
-      if (!resAnswers.ok) throw new Error(ansData?.error || 'Erro ao salvar respostas');
+      const { res: resAnswers, data: ansData } = await fetchJsonWithRetry<{ error?: string }>(
+        '/api/supho/answers',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            respondent_id: respondent.id,
+            answers: effectiveQuestions.map((q) => ({ question_id: q.id, value: answers[q.id] ?? 3 })),
+          }),
+        },
+        { stepLabel: 'Guardar respostas do respondente' }
+      );
+      if (!resAnswers.ok) {
+        throw new Error(`Guardar respostas: ${ansData?.error ?? `HTTP ${resAnswers.status}`}`);
+      }
 
       setAnswers({});
       setRespondentsCount((prev) => ({ ...prev, [selectedCampaignId]: (prev[selectedCampaignId] ?? 0) + 1 }));
@@ -206,13 +229,16 @@ export function DiagnosticoClient({ orgId, initialCampaigns }: DiagnosticoClient
     setComputing(true);
     setError(null);
     try {
-      const res = await fetch('/api/supho/diagnostic/compute', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ campaign_id: selectedCampaignId }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || 'Erro ao calcular');
+      const { res, data } = await fetchJsonWithRetry<{ error?: string }>(
+        '/api/supho/diagnostic/compute',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ campaign_id: selectedCampaignId }),
+        },
+        { stepLabel: 'Calcular resultado do diagnóstico' }
+      );
+      if (!res.ok) throw new Error(`Calcular resultado: ${data?.error ?? `HTTP ${res.status}`}`);
       router.push('/app/supho/maturidade');
       router.refresh();
     } catch (e) {
@@ -241,18 +267,25 @@ export function DiagnosticoClient({ orgId, initialCampaigns }: DiagnosticoClient
     setInviteResult(null);
     setInviteFailed([]);
     try {
-      const res = await fetch('/api/forms/invites', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          form_slug: `supho-${selectedCampaignId}`,
-          form_name: `Diagnóstico SUPHO - ${campaigns.find((c) => c.id === selectedCampaignId)?.name ?? 'Campanha'}`,
-          respondents,
-        }),
-      });
-      const data = await res.json();
+      const { res, data } = await fetchJsonWithRetry<{
+        error?: string;
+        failed?: Array<{ email: string; name?: string; error?: string }>;
+        success?: number;
+      }>(
+        '/api/forms/invites',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            form_slug: `supho-${selectedCampaignId}`,
+            form_name: `Diagnóstico SUPHO - ${campaigns.find((c) => c.id === selectedCampaignId)?.name ?? 'Campanha'}`,
+            respondents,
+          }),
+        },
+        { stepLabel: 'Disparar convites por e-mail' }
+      );
       if (!res.ok && res.status !== 207) {
-        throw new Error(data?.error || 'Erro ao disparar convites');
+        throw new Error(`Convites: ${data?.error ?? `HTTP ${res.status}`}`);
       }
       const failedList = Array.isArray(data.failed) ? data.failed : [];
       const successCount = typeof data.success === 'number' ? data.success : respondents.length - failedList.length;

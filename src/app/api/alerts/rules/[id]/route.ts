@@ -3,7 +3,7 @@
  * DELETE /api/alerts/rules/[id]?org_id=...
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { requireAuthAndOrgAccess } from '@/lib/auth';
 
 export async function PATCH(
@@ -38,19 +38,25 @@ export async function PATCH(
     return NextResponse.json({ error: 'Nenhum campo para atualizar' }, { status: 400 });
   }
 
-  const supabase = await createClient();
-  const { data, error } = await supabase
+  const admin = createAdminClient();
+  const updateRes = await admin
     .from('alert_rules')
     .update(updates)
     .eq('id', id)
-    .eq('org_id', auth.orgId)
-    .select('id, org_id, rule_key, severity, threshold, enabled, cooldown_minutes, channel_ids, created_at')
-    .single();
+    .eq('org_id', auth.orgId);
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  if (updateRes.error) {
+    return NextResponse.json({ error: updateRes.error.message }, { status: 500 });
   }
-  if (!data) {
+
+  const { data, error } = await admin
+    .from('alert_rules')
+    .select('id, org_id, rule_key, severity, threshold, enabled, cooldown_minutes, channel_ids, created_at')
+    .eq('id', id)
+    .eq('org_id', auth.orgId)
+    .maybeSingle();
+
+  if (error || !data) {
     return NextResponse.json({ error: 'Regra não encontrada' }, { status: 404 });
   }
   return NextResponse.json(data);
@@ -65,15 +71,15 @@ export async function DELETE(
   const auth = await requireAuthAndOrgAccess(orgId);
   if (!auth.ok) return auth.response;
 
-  const supabase = await createClient();
-  const { error } = await supabase
+  const admin = createAdminClient();
+  const delRes = await admin
     .from('alert_rules')
     .delete()
     .eq('id', id)
     .eq('org_id', auth.orgId);
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  if (delRes.error) {
+    return NextResponse.json({ error: delRes.error.message }, { status: 500 });
   }
   return new NextResponse(null, { status: 204 });
 }

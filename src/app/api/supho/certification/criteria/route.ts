@@ -16,11 +16,14 @@ export async function GET() {
   await requireApiUserOrgAccess(null);
 
   const admin = createAdminClient();
-  let { data, error } = await admin
+  const first = await admin
     .from('supho_certification_criteria')
     .select('id, dimension, criterion_text, max_score, sort_order')
     .order('dimension')
     .order('sort_order');
+
+  const { error } = first;
+  let data = first.data;
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!data || data.length === 0) {

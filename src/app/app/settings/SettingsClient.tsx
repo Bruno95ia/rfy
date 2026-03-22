@@ -62,6 +62,10 @@ type Config = {
 type SettingsData = {
   org: { id: string; name: string };
   webhookBaseUrl?: string;
+  deployment?: {
+    email_outbound_configured: boolean;
+    inngest_configured: boolean;
+  };
   role?: 'owner' | 'admin' | 'manager' | 'viewer';
   is_platform_admin?: boolean;
   config: Config | null;
@@ -306,6 +310,10 @@ export function SettingsClient() {
   >([]);
   const [platformUsersLoading, setPlatformUsersLoading] = useState(false);
   const [platformUsersError, setPlatformUsersError] = useState<string | null>(null);
+  const [deployment, setDeployment] = useState<NonNullable<SettingsData['deployment']>>({
+    email_outbound_configured: true,
+    inngest_configured: true,
+  });
 
   const loadSettings = async () => {
     setLoading(true);
@@ -315,6 +323,9 @@ export function SettingsClient() {
       const d = (await res.json()) as SettingsData & { error?: string };
       if (!res.ok) {
         throw new Error(d.error ?? 'Erro ao carregar configurações');
+      }
+      if (d.deployment) {
+        setDeployment(d.deployment);
       }
       setOrgName(d.org?.name ?? '');
       if (d.config) {
@@ -549,6 +560,43 @@ export function SettingsClient() {
 
   return (
     <div className="space-y-8">
+      {canManage && !deployment.email_outbound_configured && (
+        <div
+          className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950"
+          role="status"
+        >
+          <div className="flex gap-2">
+            <AlertCircle className="h-5 w-5 shrink-0 text-amber-700" aria-hidden />
+            <div>
+              <p className="font-medium">E-mail de saída não configurado no servidor</p>
+              <p className="mt-1 text-amber-900/90">
+                Alertas por e-mail, convites a membros, relatórios agendados e notificações de formulários não serão
+                enviados até existir <code className="rounded bg-amber-100/80 px-1">RESEND_API_KEY</code> nas variáveis
+                de ambiente. Os fluxos na aplicação continuam a funcionar; apenas o envio real de correio fica em falta.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+      {canManage && !deployment.inngest_configured && (
+        <div
+          className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800"
+          role="status"
+        >
+          <div className="flex gap-2">
+            <Activity className="h-5 w-5 shrink-0 text-slate-600" aria-hidden />
+            <div>
+              <p className="font-medium">Jobs assíncronos (Inngest) não configurados</p>
+              <p className="mt-1 text-slate-700">
+                Processamento em fila (CSV, relatórios recalculados, etc.) pode depender do Inngest em produção.
+                Defina <code className="rounded bg-white px-1">INNGEST_SIGNING_KEY</code> e{' '}
+                <code className="rounded bg-white px-1">INNGEST_EVENT_KEY</code> conforme o ambiente. Em desenvolvimento
+                pode usar o Inngest Dev Server.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
       <Card>
         <CardContent className="space-y-4 pt-6">
           <div className="flex flex-wrap items-center gap-2">

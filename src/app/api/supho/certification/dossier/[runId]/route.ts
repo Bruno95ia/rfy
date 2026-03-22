@@ -27,11 +27,12 @@ export async function GET(
     .select('criterion_id, score, evidence_url, notes')
     .eq('run_id', runId);
 
-  const criterionIds = [...new Set((evidences ?? []).map((e: { criterion_id: string }) => e.criterion_id))];
+  const criterionIds = [...new Set((evidences ?? []).map((e) => (e as { criterion_id: string }).criterion_id))];
   const { data: criteria } = criterionIds.length > 0
     ? await admin.from('supho_certification_criteria').select('id, dimension, criterion_text, max_score').in('id', criterionIds)
     : { data: [] };
-  const criteriaMap = new Map((criteria ?? []).map((c: { id: string }) => [c.id, c]));
+  type CriterionRow = { id: string; dimension?: string; criterion_text?: string; max_score?: number };
+  const criteriaMap = new Map((criteria ?? []).map((c) => [(c as CriterionRow).id, c as CriterionRow]));
 
   const levelLabels: Record<string, string> = { bronze: 'Bronze', prata: 'Prata', ouro: 'Ouro' };
   const html = `<!DOCTYPE html>
@@ -56,14 +57,15 @@ export async function GET(
   <table>
     <thead><tr><th>Dimensão</th><th>Critério</th><th>Pontuação (0–3)</th><th>Evidência / URL</th><th>Notas</th></tr></thead>
     <tbody>
-      ${(evidences ?? []).map((e: { criterion_id: string; score: number; evidence_url: string | null; notes: string | null }) => {
-        const c = criteriaMap.get(e.criterion_id) as { dimension?: string; criterion_text?: string; max_score?: number } | undefined;
+      ${(evidences ?? []).map((e) => {
+        const ev = e as { criterion_id: string; score: number; evidence_url: string | null; notes: string | null };
+        const c = criteriaMap.get(ev.criterion_id) as { dimension?: string; criterion_text?: string; max_score?: number } | undefined;
         return `<tr>
           <td>${c?.dimension ?? '—'}</td>
           <td>${c?.criterion_text ?? '—'}</td>
-          <td>${e.score}</td>
-          <td>${e.evidence_url ? `<a href="${e.evidence_url}">Link</a>` : '—'}</td>
-          <td>${e.notes ?? '—'}</td>
+          <td>${ev.score}</td>
+          <td>${ev.evidence_url ? `<a href="${ev.evidence_url}">Link</a>` : '—'}</td>
+          <td>${ev.notes ?? '—'}</td>
         </tr>`;
       }).join('')}
     </tbody>

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { requireAuthAndOrgAccess } from '@/lib/auth';
 
 export async function PUT(
@@ -11,20 +11,26 @@ export async function PUT(
   const auth = await requireAuthAndOrgAccess(orgId);
   if (!auth.ok) return auth.response;
 
-  const supabase = await createClient();
-  const { data, error } = await supabase
+  const admin = createAdminClient();
+  const updateRes = await admin
     .from('alerts')
     .update({ resolved_at: new Date().toISOString() })
     .eq('org_id', auth.orgId)
     .eq('id', id)
-    .is('resolved_at', null)
-    .select('id')
+    .is('resolved_at', null);
+
+  if (updateRes.error) {
+    return NextResponse.json({ error: updateRes.error.message }, { status: 500 });
+  }
+
+  const { data } = await admin
+    .from('alerts')
+    .select('id, resolved_at')
+    .eq('org_id', auth.orgId)
+    .eq('id', id)
     .maybeSingle();
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-  if (!data) {
+  if (!data || !(data as { resolved_at?: string | null }).resolved_at) {
     return NextResponse.json({ error: 'Alerta não encontrado ou já resolvido' }, { status: 404 });
   }
 

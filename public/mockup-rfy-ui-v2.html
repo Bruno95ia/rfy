@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RFY — Mockup UI v2 (pré-visualização)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400..700;1,400..700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #f1f5f9;
+      --surface: #ffffff;
+      --surface-muted: #f8fafc;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+      --primary: #4f46e5;
+      --primary-hover: #4338ca;
+      --primary-soft: #eef2ff;
+      --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
+      --shadow-md: 0 6px 12px -4px rgba(15, 23, 42, 0.08);
+      --radius: 12px;
+      --radius-sm: 8px;
+    }
+    .dark {
+      --bg: #0f172a;
+      --surface: #1e293b;
+      --surface-muted: #334155;
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --border: #334155;
+      --primary-soft: #312e81;
+      --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+      --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.35);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+      background:
+        radial-gradient(1200px 480px at 0% 0%, rgba(238, 242, 255, 0.9) 0%, transparent 55%),
+        radial-gradient(900px 400px at 100% 0%, rgba(224, 242, 254, 0.35) 0%, transparent 50%),
+        var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+    .dark body {
+      background: var(--bg);
+    }
+    .layout { display: flex; min-height: 100vh; }
+    .sidebar {
+      width: 260px;
+      flex-shrink: 0;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      box-shadow: 2px 0 24px -4px rgba(15, 23, 42, 0.06);
+      display: flex;
+      flex-direction: column;
+    }
+    .sidebar-head {
+      height: 64px;
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .logo-dot {
+      width: 28px; height: 28px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, var(--primary) 0%, #7c3aed 100%);
+    }
+    .nav { flex: 1; overflow-y: auto; padding: 12px; }
+    .nav-cat { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); padding: 0 10px; margin-bottom: 8px; }
+    .nav a {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 12px; border-radius: 12px;
+      font-size: 14px; font-weight: 500;
+      color: var(--text-muted); text-decoration: none;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+    .nav a:hover { background: var(--surface-muted); color: var(--text); }
+    .nav a.active { background: var(--primary-soft); color: var(--primary); }
+    .sidebar-foot {
+      padding: 12px;
+      border-top: 1px solid var(--border);
+    }
+    .org-pill {
+      background: var(--surface-muted);
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text);
+    }
+    .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+    .topbar {
+      position: sticky; top: 0; z-index: 30;
+      height: 56px;
+      display: flex; align-items: center; gap: 12px;
+      padding: 0 16px;
+      background: color-mix(in srgb, var(--surface) 92%, transparent);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      box-shadow: var(--shadow-sm);
+    }
+    .topbar-mobile-title {
+      flex: 1; min-width: 0;
+      text-align: center;
+      font-size: 14px; font-weight: 600;
+      color: var(--text);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    @media (min-width: 640px) {
+      .topbar-mobile-title { display: none; }
+    }
+    .topbar-desktop { display: none; flex: 1; min-width: 0; }
+    @media (min-width: 640px) {
+      .topbar-desktop { display: block; }
+    }
+    .topbar-desktop p:first-child { font-size: 14px; font-weight: 600; color: var(--text); }
+    .topbar-desktop p:last-child { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      height: 32px; padding: 0 12px;
+      font-size: 13px; font-weight: 600;
+      border-radius: 10px; border: none; cursor: pointer;
+      font-family: inherit;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .btn-primary {
+      background: var(--primary); color: #fff;
+      box-shadow: var(--shadow-sm);
+    }
+    .btn-primary:hover { background: var(--primary-hover); transform: translateY(-1px); }
+    .btn-outline {
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-outline:hover { background: var(--surface-muted); }
+    .content {
+      flex: 1;
+      padding: 24px 16px;
+      max-width: 1200px;
+      margin: 0 auto;
+      width: 100%;
+    }
+    @media (min-width: 1024px) {
+      .content { padding: 32px 32px; }
+    }
+    .breadcrumb {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 6px 12px;
+      border-radius: 9999px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      font-size: 12px; font-weight: 500;
+      color: var(--text-muted);
+      box-shadow: var(--shadow-sm);
+      margin-bottom: 20px;
+    }
+    .page-title { font-size: clamp(1.5rem, 4vw, 1.875rem); font-weight: 700; letter-spacing: -0.02em; color: var(--text); }
+    .page-sub {
+      margin-top: 8px; max-width: 42rem;
+      font-size: 14px; line-height: 1.65;
+      color: var(--text-muted);
+    }
+    .actions { margin-top: 20px; display: flex; flex-wrap: wrap; gap: 8px; }
+    .card {
+      margin-top: 28px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      box-shadow: var(--shadow-sm);
+      overflow: hidden;
+    }
+    .card-inner {
+      display: grid;
+      gap: 32px;
+      padding: 32px 24px;
+    }
+    @media (min-width: 1024px) {
+      .card-inner { grid-template-columns: 1.15fr 0.85fr; padding: 40px 32px; }
+    }
+    .empty-hero-icon {
+      width: 64px; height: 64px;
+      border-radius: var(--radius);
+      background: var(--primary-soft);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 28px;
+    }
+    .empty h2 { margin-top: 24px; font-size: 1.375rem; font-weight: 700; letter-spacing: -0.02em; }
+    .empty p { margin-top: 8px; font-size: 14px; color: var(--text-muted); max-width: 36rem; line-height: 1.6; }
+    .empty-cta { margin-top: 20px; display: flex; flex-wrap: wrap; gap: 10px; }
+    .checklist { border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-muted); }
+    .checklist h3 { padding: 16px 20px; font-size: 15px; font-weight: 600; border-bottom: 1px solid var(--border); }
+    .checklist-steps { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+    .step {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+      background: var(--surface);
+    }
+    .step-label { font-size: 10px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-muted); }
+    .step-title { font-size: 14px; font-weight: 600; margin-top: 4px; }
+    .step-desc { font-size: 12px; color: var(--text-muted); margin-top: 6px; line-height: 1.5; }
+    .step a { display: inline-block; margin-top: 8px; font-size: 12px; font-weight: 600; color: var(--primary); text-decoration: none; }
+    .step a:hover { text-decoration: underline; }
+    .mock-banner {
+      margin-top: 24px;
+      padding: 12px 16px;
+      border-radius: var(--radius-sm);
+      border: 1px solid color-mix(in srgb, var(--primary) 25%, var(--border));
+      background: var(--primary-soft);
+      font-size: 13px;
+      color: var(--text);
+    }
+    .toggle-wrap { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+    .badge {
+      font-size: 11px; font-weight: 600;
+      padding: 4px 10px; border-radius: 9999px;
+      border: 1px solid var(--border);
+      background: var(--surface-muted);
+      color: var(--text-muted);
+    }
+    @media (max-width: 1023px) {
+      .sidebar { display: none; }
+    }
+    .menu-hint { display: inline-flex; }
+    @media (min-width: 640px) {
+      .menu-hint { display: none; }
+    }
+    .ai-badge { display: none; }
+    @media (min-width: 640px) {
+      .ai-badge { display: inline-flex; }
+    }
+    .note {
+      margin-top: 32px;
+      padding: 16px;
+      border-radius: var(--radius-sm);
+      border: 1px dashed var(--border);
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="sidebar-head">
+        <div class="logo-dot" aria-hidden="true"></div>
+        <div style="margin-left:12px;">
+          <div style="font-size:14px;font-weight:700;color:var(--text);">RFY</div>
+          <div style="font-size:11px;color:var(--text-muted);font-weight:500;">Torre de Controle</div>
+        </div>
+      </div>
+      <nav class="nav" aria-label="Navegação">
+        <div class="nav-cat">Torre de Controle</div>
+        <a class="active" href="#">Receita (RFY)</a>
+        <div class="nav-cat" style="margin-top:16px;">Data</div>
+        <a href="#">Uploads</a>
+        <a href="#">Configurações</a>
+      </nav>
+      <div class="sidebar-foot">
+        <div class="org-pill">Minha organização</div>
+      </div>
+    </aside>
+
+    <div class="main">
+      <header class="topbar">
+        <span class="badge menu-hint">☰</span>
+        <div class="topbar-mobile-title">Receita (RFY)</div>
+        <div class="topbar-desktop">
+          <p>Receita (RFY)</p>
+          <p>Minha organização</p>
+        </div>
+        <span class="badge ai-badge">AI em configuração</span>
+        <button type="button" class="btn btn-primary" style="margin-left:auto;">
+          <span>↑</span> Upload CSV
+        </button>
+        <div class="toggle-wrap">
+          <button type="button" class="btn btn-outline" id="themeBtn" title="Alternar tema">◐ Tema</button>
+        </div>
+      </header>
+
+      <main class="content">
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <span>App</span>
+          <span style="opacity:.5">›</span>
+          <span style="color:var(--text);font-weight:600">Dashboard RFY</span>
+        </nav>
+
+        <header>
+          <h1 class="page-title">Control Deck RFY</h1>
+          <p class="page-sub">
+            Boa noite. Visão de governança: Receita Confiável, distorção (Receita Inflada) e as 3 decisões prioritárias para reduzir risco.
+          </p>
+          <div class="actions">
+            <button type="button" class="btn btn-primary">Fazer primeiro upload</button>
+            <button type="button" class="btn btn-outline">Configurar integração</button>
+          </div>
+        </header>
+
+        <div class="mock-banner">
+          <strong>Mockup v2</strong> — Tipografia Plus Jakarta Sans, shell alinhado a tokens, barra superior com título visível no mobile, cartões com hierarquia clara.
+        </div>
+
+        <div class="card">
+          <div class="card-inner">
+            <div class="empty">
+              <div class="empty-hero-icon">📊</div>
+              <h2>Seu workspace está pronto. Falta apenas ingestão de dados.</h2>
+              <p>Conecte seu CRM ou envie CSV para gerar RFY Index, Receita Confiável, Receita Inflada e decisões prioritárias.</p>
+              <div class="empty-cta">
+                <button type="button" class="btn btn-primary">Fazer primeiro upload</button>
+                <button type="button" class="btn btn-outline">Integrações</button>
+                <button type="button" class="btn btn-outline">Configurações</button>
+              </div>
+            </div>
+            <div class="checklist">
+              <h3>Primeiro valor em 4 passos</h3>
+              <div class="checklist-steps">
+                <div class="step">
+                  <div class="step-label">Passo 1</div>
+                  <div class="step-title">Ingerir dados</div>
+                  <div class="step-desc">Envie CSVs em Uploads ou configure o webhook em Configurações.</div>
+                  <a href="#">Abrir Uploads →</a>
+                </div>
+                <div class="step">
+                  <div class="step-label">Passo 2</div>
+                  <div class="step-title">Aguardar processamento</div>
+                  <div class="step-desc">Relatório gerado automaticamente (fila Inngest).</div>
+                  <a href="#">Atualizar depois →</a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <p class="note">
+          Referência visual alinhada à app: <code>AppShell</code>, <code>PageHeader</code>, <code>globals.css</code> e empty state do dashboard.
+          Com o servidor Next a correr: <strong>/mockup-rfy-ui-v2</strong> (recomendado) ou <strong>/mockup-rfy-ui-v2.html</strong> (rewrite para a mesma página). Também podes abrir o ficheiro em <code>public/mockup-rfy-ui-v2.html</code> diretamente no browser.
+        </p>
+      </main>
+    </div>
+  </div>
+
+  <script>
+    document.getElementById('themeBtn').addEventListener('click', function () {
+      document.documentElement.classList.toggle('dark');
+    });
+  </script>
+</body>
+</html>

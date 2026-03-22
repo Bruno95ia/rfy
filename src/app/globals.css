@@ -1,12 +1,12 @@
 @import "tailwindcss";
 
 :root {
-  --rfy-color-background: #f3f6fb;
+  --rfy-color-background: #f1f5f9;
   --rfy-color-surface: #ffffff;
   --rfy-color-surface-muted: #f8fafc;
   --rfy-color-surface-elevated: #ffffff;
   --rfy-color-text: #0f172a;
-  --rfy-color-text-muted: #475569;
+  --rfy-color-text-muted: #64748b;
   --rfy-color-border: #e2e8f0;
   --rfy-color-border-strong: #cbd5e1;
   --rfy-color-primary: #4f46e5;
@@ -60,7 +60,7 @@
   --radius-md: 0.75rem;
   --radius-lg: 1rem;
 
-  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
   --shadow-md: 0 6px 12px -4px rgba(15, 23, 42, 0.08), 0 2px 4px -2px rgba(15, 23, 42, 0.05);
   --shadow-lg: 0 14px 24px -8px rgba(15, 23, 42, 0.1), 0 6px 10px -6px rgba(15, 23, 42, 0.05);
   --shadow-xl: 0 20px 25px -5px rgba(15, 23, 42, 0.06), 0 8px 10px -6px rgba(15, 23, 42, 0.04);
@@ -101,6 +101,10 @@
   --rfy-color-warning-soft: #78350f;
   --rfy-color-danger-soft: #7f1d1d;
   --rfy-color-overlay: rgba(0, 0, 0, 0.6);
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 8px 20px -8px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 14px 28px -10px rgba(0, 0, 0, 0.4);
 }
 
 .dark body {
@@ -130,7 +134,7 @@
   --color-muted: var(--rfy-color-surface-muted);
   --color-muted-foreground: var(--rfy-color-text-muted);
   --color-overlay: var(--rfy-color-overlay);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-sans-ui);
   --font-mono: var(--font-geist-mono);
 }
 
@@ -141,8 +145,8 @@
 
 body {
   background:
-    radial-gradient(1400px 520px at 0% 0%, rgba(238, 242, 255, 0.85) 0%, transparent 52%),
-    radial-gradient(1100px 420px at 100% 0%, rgba(224, 242, 254, 0.45) 0%, transparent 48%),
+    radial-gradient(1200px 480px at 0% 0%, rgba(238, 242, 255, 0.9) 0%, transparent 55%),
+    radial-gradient(900px 400px at 100% 0%, rgba(224, 242, 254, 0.35) 0%, transparent 50%),
     var(--color-background);
   color: var(--color-text);
   font-family: var(--font-sans), system-ui, sans-serif;
@@ -156,7 +160,7 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f5f9;
+  background: var(--color-background);
   border-radius: 4px;
 }
 
@@ -167,6 +171,18 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: var(--color-surface-muted);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: color-mix(in oklab, var(--color-text-muted) 45%, transparent);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in oklab, var(--color-text-muted) 65%, transparent);
 }
 
 /* Selection */

@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Plus_Jakarta_Sans, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/use-toast";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const fontSans = Plus_Jakarta_Sans({
+  variable: "--font-sans-ui",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
 });
 
 const geistMono = Geist_Mono({
@@ -35,7 +36,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className={`${geistSans.variable} ${geistMono.variable} min-h-screen antialiased`}>
+      <body className={`${fontSans.variable} ${geistMono.variable} min-h-screen antialiased`}>
         <Toaster>{children}</Toaster>
       </body>
     </html>

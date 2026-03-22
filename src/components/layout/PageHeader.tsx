@@ -50,17 +50,17 @@ export function PageHeader({
       )}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-[var(--color-text)] sm:text-3xl">
+          <h1 className="text-[clamp(1.5rem,4vw,1.875rem)] font-bold tracking-[-0.02em] text-[var(--color-text)]">
             {title}
           </h1>
           {subtitle && (
-            <div className="mt-2 max-w-2xl text-sm leading-relaxed text-[var(--color-text-muted)]">
+            <div className="mt-2 max-w-[42rem] text-sm leading-[1.65] text-[var(--color-text-muted)]">
               {subtitle}
             </div>
           )}
         </div>
         {actions && (
-          <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>
+          <div className="mt-1 flex shrink-0 flex-wrap items-center gap-2 sm:mt-0">{actions}</div>
         )}
       </div>
     </header>

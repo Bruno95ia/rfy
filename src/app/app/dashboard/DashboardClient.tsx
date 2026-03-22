@@ -657,67 +657,67 @@ export function DashboardClient({
       },
     ];
     return (
-      <Card className="border-[var(--color-border)] bg-[var(--color-surface)]">
-        <CardContent className="grid gap-8 px-6 py-10 lg:grid-cols-[1.2fr_0.8fr]">
+      <div className="overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-sm)]">
+        <div className="grid gap-8 px-6 py-8 lg:grid-cols-[1.15fr_0.85fr] lg:gap-8 lg:px-8 lg:py-10">
           <div>
-            <div className="flex h-16 w-16 items-center justify-center rounded-[var(--radius-md)] bg-[var(--color-primary-soft)]">
+            <div className="flex h-16 w-16 items-center justify-center rounded-[var(--radius-lg)] bg-[var(--color-primary-soft)]">
               <BarChart3 className="h-8 w-8 text-[var(--color-primary)]" aria-hidden />
             </div>
-            <h2 className="mt-6 text-2xl font-semibold text-[var(--color-text)]">
+            <h2 className="mt-6 text-[1.375rem] font-bold tracking-[-0.02em] text-[var(--color-text)]">
               Seu workspace está pronto. Falta apenas ingestão de dados.
             </h2>
-            <p className="mt-2 max-w-xl text-sm text-[var(--color-text-muted)]">
+            <p className="mt-2 max-w-xl text-sm leading-relaxed text-[var(--color-text-muted)]">
               Conecte seu CRM ou envie CSV para gerar RFY Index, Receita Confiável, Receita Inflada e decisões prioritárias.
             </p>
-            <div className="mt-6 flex flex-wrap items-center gap-2">
+            <div className="mt-5 flex flex-wrap items-center gap-2.5">
               <Link
                 href="/app/uploads"
-                className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-primary)] px-4 py-2 text-sm font-medium text-[var(--color-primary-foreground)]"
+                className="inline-flex h-9 items-center rounded-[10px] bg-[var(--color-primary)] px-3 text-sm font-semibold text-[var(--color-primary-foreground)] shadow-[var(--shadow-sm)] transition-transform hover:bg-[var(--color-primary-hover)] hover:-translate-y-px"
               >
                 Fazer primeiro upload
               </Link>
               <Link
                 href="/app/integracoes"
-                className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2 text-sm font-medium text-[var(--color-text)]"
+                className="inline-flex h-9 items-center rounded-[10px] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm font-semibold text-[var(--color-text)] hover:bg-[var(--color-surface-muted)]"
               >
                 Integrações
               </Link>
               <Link
                 href="/app/settings"
-                className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2 text-sm font-medium text-[var(--color-text)]"
+                className="inline-flex h-9 items-center rounded-[10px] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm font-semibold text-[var(--color-text)] hover:bg-[var(--color-surface-muted)]"
               >
                 Configurações
               </Link>
             </div>
           </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Primeiro valor em 4 passos</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
+          <div className="flex min-h-0 flex-col overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface-muted)]">
+            <h3 className="border-b border-[var(--color-border)] px-5 py-4 text-[15px] font-semibold text-[var(--color-text)]">
+              Primeiro valor em 4 passos
+            </h3>
+            <div className="flex flex-col gap-2.5 p-3">
               {steps.map((step) => (
                 <div
                   key={step.n}
-                  className="rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3 py-2.5"
+                  className="rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3.5 py-3"
                 >
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.05em] text-[var(--color-text-muted)]">
                     Passo {step.n}
                   </p>
-                  <p className="text-sm font-medium text-[var(--color-text)]">{step.title}</p>
-                  <p className="mt-1 text-xs text-[var(--color-text-muted)]">{step.body}</p>
+                  <p className="mt-1 text-sm font-semibold text-[var(--color-text)]">{step.title}</p>
+                  <p className="mt-1.5 text-xs leading-relaxed text-[var(--color-text-muted)]">{step.body}</p>
                   <Link
                     href={step.href}
-                    className="mt-2 inline-block text-xs font-medium text-[var(--color-primary)] hover:underline"
+                    className="mt-2 inline-block text-xs font-semibold text-[var(--color-primary)] hover:underline"
                   >
                     {step.hrefLabel} →
                   </Link>
                 </div>
               ))}
-            </CardContent>
-          </Card>
-        </CardContent>
-      </Card>
+            </div>
+          </div>
+        </div>
+      </div>
     );
   }
 

@@ -6,6 +6,8 @@ const nextConfig: NextConfig = {
     return [
       { source: '/apple-touch-icon.png', destination: '/logo/revenue-engine-symbol-favicon.svg' },
       { source: '/apple-touch-icon-precomposed.png', destination: '/logo/revenue-engine-symbol-favicon.svg' },
+      // App Router não serve .html em /public; redireciona para a rota que lê o ficheiro
+      { source: '/mockup-rfy-ui-v2.html', destination: '/mockup-rfy-ui-v2' },
     ];
   },
   async headers() {

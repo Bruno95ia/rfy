@@ -103,12 +103,14 @@ export function AppShell({
       .flatMap(({ items }) => items)
       .find((item) => pathname === item.href || pathname.startsWith(item.href + '/')) ?? null;
 
+  const isUploadsPage = pathname.startsWith('/app/uploads');
+
   return (
-    <div className="flex min-h-screen bg-slate-50/40">
+    <div className="flex min-h-screen bg-[var(--color-background)]">
       {/* Overlay mobile */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-40 bg-slate-900/30 backdrop-blur-sm lg:hidden"
+          className="fixed inset-0 z-40 bg-[var(--color-overlay)] backdrop-blur-sm lg:hidden"
           onClick={() => setSidebarOpen(false)}
           aria-hidden="true"
         />
@@ -117,27 +119,27 @@ export function AppShell({
       {/* Sidebar */}
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-50 w-[260px] transform border-r border-slate-200/80 bg-white shadow-[2px_0_24px_-4px_rgba(15,23,42,0.06)] transition-all duration-300 ease-out lg:relative lg:translate-x-0',
+          'fixed inset-y-0 left-0 z-50 w-[260px] transform border-r border-[var(--color-border)] bg-[var(--color-surface)] shadow-[2px_0_24px_-4px_rgba(15,23,42,0.06)] transition-all duration-300 ease-out dark:shadow-[2px_0_24px_-4px_rgba(0,0,0,0.25)] lg:relative lg:translate-x-0',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >
-        <div className="flex h-16 items-center justify-between border-b border-slate-100 px-4">
+        <div className="flex h-16 items-center justify-between border-b border-[var(--color-border)] px-4">
           <Link
             href="/app/dashboard"
             className="flex items-center gap-3 transition-opacity hover:opacity-90"
           >
             <Logo variant="primary" size={28} className="shrink-0" />
             <div className="flex min-w-0 flex-col">
-              <span className="truncate text-sm font-semibold tracking-tight text-slate-900">
+              <span className="truncate text-sm font-semibold tracking-tight text-[var(--color-text)]">
                 RFY
               </span>
-              <span className="text-[11px] font-medium text-slate-500">Torre de Controle</span>
+              <span className="text-[11px] font-medium text-[var(--color-text-muted)]">Torre de Controle</span>
             </div>
           </Link>
           <button
             type="button"
             onClick={() => setSidebarOpen(false)}
-            className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 lg:hidden"
+            className="rounded-lg p-2 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)] lg:hidden"
             aria-label="Fechar menu"
           >
             <X className="h-5 w-5" />
@@ -147,11 +149,11 @@ export function AppShell({
         <nav className="flex flex-1 flex-col overflow-y-auto p-3" aria-label="Navegação principal">
           {navItems.map(({ category, items }) => (
             <div key={category} className="mb-4">
-              <p className="mb-0.5 px-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+              <p className="mb-0.5 px-2.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
                 {category}
               </p>
               {category === 'SUPHO' && (
-                <p className="mb-1.5 px-2.5 text-[10px] text-slate-400">
+                <p className="mb-1.5 px-2.5 text-[10px] text-[var(--color-text-muted)]">
                   Maturidade organizacional
                 </p>
               )}
@@ -167,11 +169,16 @@ export function AppShell({
                       className={cn(
                         'flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200',
                         isActive
-                          ? 'bg-indigo-50 text-indigo-700 shadow-sm'
-                          : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                          ? 'bg-[var(--color-primary-soft)] text-[var(--color-primary)] shadow-[var(--shadow-sm)]'
+                          : 'text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)]'
                       )}
                     >
-                      <Icon className={cn('h-[18px] w-[18px] shrink-0', isActive && 'text-indigo-600')} />
+                      <Icon
+                        className={cn(
+                          'h-[18px] w-[18px] shrink-0',
+                          isActive && 'text-[var(--color-primary)]'
+                        )}
+                      />
                       {label}
                     </Link>
                   );
@@ -181,12 +188,12 @@ export function AppShell({
           ))}
         </nav>
 
-        <div className="border-t border-slate-100 p-3">
-          <div className="rounded-xl bg-slate-50/90 px-3 py-2.5">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+        <div className="border-t border-[var(--color-border)] p-3">
+          <div className="rounded-xl bg-[var(--color-surface-muted)] px-3 py-2.5">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
               Organização
             </p>
-            <p className="mt-0.5 truncate text-sm font-medium text-slate-800">
+            <p className="mt-0.5 truncate text-sm font-medium text-[var(--color-text)]">
               {orgName}
             </p>
           </div>
@@ -195,36 +202,39 @@ export function AppShell({
 
       {/* Main */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b border-slate-200/80 bg-white/90 px-4 shadow-sm backdrop-blur-md lg:px-6">
+        <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2 border-b border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-surface)_92%,transparent)] px-4 shadow-[var(--shadow-sm)] backdrop-blur-[12px] sm:gap-3 lg:px-6 dark:bg-[color-mix(in_srgb,var(--color-surface)_90%,transparent)]">
           <button
             type="button"
             onClick={() => setSidebarOpen(true)}
-            className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700 lg:hidden"
+            className="shrink-0 rounded-lg p-2 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)] lg:hidden"
             aria-label="Abrir menu"
           >
             <Menu className="h-5 w-5" />
           </button>
 
-          <div className="flex flex-1 items-center gap-4">
-            <div className="hidden min-w-0 flex-1 sm:block">
-              <p className="truncate text-sm font-semibold text-slate-900">
-                {activeItem?.label ?? 'Painel'}
-              </p>
-              <p className="truncate text-xs text-slate-500">
-                {orgName}
-              </p>
-            </div>
+          <div className="min-w-0 flex-1 sm:hidden">
+            <p className="truncate text-center text-sm font-semibold text-[var(--color-text)]">
+              {activeItem?.label ?? 'Painel'}
+            </p>
+          </div>
 
-            <div className="ml-auto flex items-center gap-2">
+          <div className="hidden min-w-0 flex-1 sm:block">
+            <p className="truncate text-sm font-semibold leading-tight text-[var(--color-text)]">
+              {activeItem?.label ?? 'Painel'}
+            </p>
+            <p className="mt-0.5 truncate text-xs text-[var(--color-text-muted)]">{orgName}</p>
+          </div>
+
+          <div className="flex shrink-0 items-center gap-2">
               {!aiActive && (
-                <span className="hidden items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50/80 px-2.5 py-1 text-xs font-medium text-slate-600 sm:inline-flex">
-                  <Sparkles className="h-3.5 w-3.5 text-slate-400" />
+                <span className="hidden items-center gap-1.5 rounded-full border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-2.5 py-1 text-xs font-medium text-[var(--color-text-muted)] sm:inline-flex">
+                  <Sparkles className="h-3.5 w-3.5 opacity-70" />
                   AI em configuração
                 </span>
               )}
               {aiActive && (
                 <span
-                  className="hidden items-center gap-1.5 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700 sm:inline-flex"
+                  className="hidden items-center gap-1.5 rounded-full bg-[var(--color-primary-soft)] px-2.5 py-1 text-xs font-medium text-[var(--color-primary)] sm:inline-flex"
                   title="AI ativo — insights e forecast disponíveis"
                 >
                   <Sparkles className="h-3.5 w-3.5" />
@@ -233,7 +243,11 @@ export function AppShell({
               )}
 
               <Link href="/app/uploads">
-                <Button size="sm" className="shrink-0 font-medium shadow-sm">
+                <Button
+                  variant={isUploadsPage ? 'outline' : 'default'}
+                  size="sm"
+                  className="shrink-0 font-semibold shadow-[var(--shadow-sm)]"
+                >
                   <Upload className="h-4 w-4" />
                   Upload CSV
                 </Button>
@@ -245,17 +259,17 @@ export function AppShell({
                 <button
                   type="button"
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
-                  className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-sm transition-all hover:border-slate-300 hover:bg-slate-50 hover:shadow-sm"
+                  className="flex items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1.5 text-sm transition-all hover:border-[var(--color-border-strong)] hover:bg-[var(--color-surface-muted)] hover:shadow-[var(--shadow-sm)]"
                   aria-expanded={userMenuOpen}
                   aria-haspopup="true"
                 >
-                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-indigo-100 text-xs font-semibold text-indigo-700">
+                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--color-primary-soft)] text-xs font-semibold text-[var(--color-primary)]">
                     {getInitials(userEmail)}
                   </div>
-                  <span className="hidden max-w-[120px] truncate text-left text-slate-600 sm:inline">
+                  <span className="hidden max-w-[120px] truncate text-left text-[var(--color-text-muted)] sm:inline">
                     {userEmail}
                   </span>
-                  <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" />
+                  <ChevronDown className="h-4 w-4 shrink-0 text-[var(--color-text-muted)]" />
                 </button>
                 {userMenuOpen && (
                   <>
@@ -264,23 +278,23 @@ export function AppShell({
                       onClick={() => setUserMenuOpen(false)}
                       aria-hidden="true"
                     />
-                    <div className="absolute right-0 top-full z-50 mt-2 w-64 rounded-xl border border-slate-200 bg-white p-2 shadow-lg ring-1 ring-slate-900/5">
+                    <div className="absolute right-0 top-full z-50 mt-2 w-64 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-2 shadow-[var(--shadow-lg)] ring-1 ring-black/5 dark:ring-white/10">
                       <div className="px-3 py-2">
-                        <p className="text-xs font-medium uppercase tracking-wider text-slate-500">
+                        <p className="text-xs font-medium uppercase tracking-wider text-[var(--color-text-muted)]">
                           Conta
                         </p>
-                        <p className="mt-1 truncate text-sm font-medium text-slate-900">
+                        <p className="mt-1 truncate text-sm font-medium text-[var(--color-text)]">
                           {userEmail}
                         </p>
-                        <p className="truncate text-xs text-slate-500">
+                        <p className="truncate text-xs text-[var(--color-text-muted)]">
                           {orgName}
                         </p>
                       </div>
-                      <div className="my-1 h-px bg-slate-200" />
+                      <div className="my-1 h-px bg-[var(--color-border)]" />
                       <form action="/api/auth/signout" method="post">
                         <button
                           type="submit"
-                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900"
+                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)]"
                         >
                           <LogOut className="h-4 w-4 shrink-0" />
                           Sair
@@ -290,12 +304,11 @@ export function AppShell({
                   </>
                 )}
               </div>
-            </div>
           </div>
         </header>
 
         <main className="flex-1 px-4 py-6 lg:px-8 lg:py-8">
-          <div className="mx-auto max-w-6xl">
+          <div className="mx-auto w-full max-w-[1200px]">
             {children}
           </div>
         </main>

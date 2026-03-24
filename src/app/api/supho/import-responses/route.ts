@@ -6,7 +6,7 @@ import { checkRateLimit } from '@/lib/ratelimit';
 import { checkOrgLimit, recordUsageEvent, appendAuditLog } from '@/lib/billing';
 import type { SuphoImportGroup } from '@/lib/supho/import-external-responses';
 import {
-  parseSuphoImportCsv,
+  parseSuphoImportFromBuffer,
   parseSuphoImportJson,
   validateImportGroupsAgainstCampaign,
   persistSuphoImportGroups,
@@ -75,37 +75,23 @@ export async function POST(req: NextRequest) {
     orgId = oId.trim();
     campaignId = cId.trim();
 
-    const name = file.name.toLowerCase();
     const buf = Buffer.from(await file.arrayBuffer());
-    const text = buf.toString('utf-8');
+    const parsedFile = parseSuphoImportFromBuffer(buf, file.name, { mimeType: file.type });
 
-    if (name.endsWith('.json') || file.type === 'application/json') {
-      let json: unknown;
-      try {
-        json = JSON.parse(text);
-      } catch {
-        return NextResponse.json({ error: 'JSON inválido' }, { status: 400 });
-      }
-      const parsed = parseSuphoImportJson(json);
-      if (!parsed.ok) {
-        return NextResponse.json({ error: parsed.error }, { status: 400 });
-      }
-      if (parsed.campaign_id !== campaignId) {
+    if (!parsedFile.ok) {
+      return NextResponse.json({ error: parsedFile.error }, { status: 400 });
+    }
+
+    if (parsedFile.kind === 'json') {
+      if (parsedFile.campaign_id !== campaignId) {
         return NextResponse.json(
           { error: 'campaign_id do arquivo difere do campaign_id enviado no formulário' },
           { status: 400 }
         );
       }
-      groups = parsed.groups;
+      groups = parsedFile.groups;
     } else {
-      const parsed = parseSuphoImportCsv(text);
-      if (parsed.errors.length > 0) {
-        return NextResponse.json(
-          { error: parsed.errors.slice(0, 8).join(' | ') },
-          { status: 400 }
-        );
-      }
-      groups = parsed.groups;
+      groups = parsedFile.groups;
     }
   } else if (contentType.includes('application/json')) {
     let body: unknown;

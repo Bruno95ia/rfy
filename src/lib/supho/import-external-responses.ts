@@ -1,10 +1,11 @@
 /**
  * Importação em lote de respostas SUPHO coletadas fora da RFY (Typeform, Google Forms, etc.).
  * Formato CSV longo: uma linha por (respondente × pergunta).
+ * Delimitadores (; , tab |) e Excel (.xlsx/.xls) suportados.
  */
-import { parse } from 'csv-parse/sync';
 import { z } from 'zod';
 import type { AdminDbClientType } from '@/lib/supabase/admin';
+import { parseFlexibleDelimited, parseExcelToMatrix } from '@/lib/piperun/flexible-import';
 
 export type SuphoImportAnswer = { question_id: string; value: number };
 
@@ -48,37 +49,41 @@ const TIME_AREA_ALIASES = ['time_area', 'time', 'area', 'area_tempo'];
 const UNIT_ALIASES = ['unit', 'unidade'];
 const EXTERNAL_ALIASES = ['external_id', 'id_externo', 'grupo', 'group_id', 'respondent_key', 'chave'];
 
-export function parseSuphoImportCsv(csvBody: string): { groups: SuphoImportGroup[]; errors: string[] } {
-  const errors: string[] = [];
-  const raw = stripBom(csvBody);
-  const withoutComments = raw
+function stripCommentLines(raw: string): string {
+  return raw
     .split(/\r?\n/)
     .filter((line) => {
       const t = line.trim();
       return t.length > 0 && !t.startsWith('#');
     })
     .join('\n');
+}
 
-  if (!withoutComments.trim()) {
-    return { groups: [], errors: ['Arquivo CSV vazio'] };
+function stripCommentRowsFromMatrix(rows: string[][]): string[][] {
+  return rows.filter((r) => {
+    const first = String(r[0] ?? '').trim();
+    return first.length > 0 && !first.startsWith('#');
+  });
+}
+
+/** Cabeçalho na primeira linha; colunas com aliases (respondent, question_id, value, …). */
+export function parseSuphoImportMatrix(rows: string[][]): { groups: SuphoImportGroup[]; errors: string[] } {
+  const errors: string[] = [];
+  const data = stripCommentRowsFromMatrix(
+    rows.filter((r) => r.some((c) => String(c).trim() !== ''))
+  );
+  if (data.length < 2) {
+    return { groups: [], errors: ['Arquivo precisa de cabeçalho e pelo menos uma linha de dados'] };
   }
 
-  let records: Record<string, unknown>[];
-  try {
-    records = parse(withoutComments, {
-      columns: true,
-      skip_empty_lines: true,
-      trim: true,
-      relax_column_count: true,
-    }) as Record<string, unknown>[];
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return { groups: [], errors: [`CSV inválido: ${msg}`] };
-  }
-
-  if (records.length === 0) {
-    return { groups: [], errors: ['Nenhuma linha de dados no CSV'] };
-  }
+  const headers = data[0]!.map((h) => String(h ?? '').trim());
+  const records: Record<string, unknown>[] = data.slice(1).map((row) => {
+    const o: Record<string, unknown> = {};
+    headers.forEach((h, i) => {
+      if (h) o[h] = row[i] ?? '';
+    });
+    return o;
+  });
 
   type Acc = {
     role: string;
@@ -157,10 +162,98 @@ export function parseSuphoImportCsv(csvBody: string): { groups: SuphoImportGroup
     return { groups: [], errors };
   }
   if (groups.length === 0) {
-    return { groups: [], errors: ['Nenhum respondente válido no CSV'] };
+    return { groups: [], errors: ['Nenhum respondente válido nos dados importados'] };
   }
 
   return { groups, errors: [] };
+}
+
+export function parseSuphoImportCsv(csvBody: string): { groups: SuphoImportGroup[]; errors: string[] } {
+  const raw = stripBom(csvBody);
+  const withoutComments = stripCommentLines(raw);
+  if (!withoutComments.trim()) {
+    return { groups: [], errors: ['Arquivo vazio'] };
+  }
+  const rows = parseFlexibleDelimited(withoutComments);
+  return parseSuphoImportMatrix(rows);
+}
+
+function isExcelFilename(name: string): boolean {
+  const n = name.toLowerCase();
+  return n.endsWith('.xlsx') || n.endsWith('.xls');
+}
+
+/**
+ * Detecta JSON SUPHO ou planilha (texto com delimitador automático ou Excel).
+ */
+export function parseSuphoImportFromBuffer(
+  buffer: Buffer,
+  filename: string,
+  options?: { mimeType?: string | null }
+):
+  | { ok: true; kind: 'json'; campaign_id: string; groups: SuphoImportGroup[] }
+  | { ok: true; kind: 'tabular'; groups: SuphoImportGroup[] }
+  | { ok: false; error: string } {
+  const name = filename.toLowerCase();
+  const mime = (options?.mimeType ?? '').toLowerCase();
+
+  if (mime === 'application/json' || mime === 'text/json') {
+    let json: unknown;
+    try {
+      json = JSON.parse(stripBom(buffer.toString('utf-8')));
+    } catch {
+      return { ok: false, error: 'JSON inválido' };
+    }
+    const parsed = parseSuphoImportJson(json);
+    if (!parsed.ok) return { ok: false, error: parsed.error };
+    return { ok: true, kind: 'json', campaign_id: parsed.campaign_id, groups: parsed.groups };
+  }
+
+  if (name.endsWith('.json')) {
+    let json: unknown;
+    try {
+      json = JSON.parse(stripBom(buffer.toString('utf-8')));
+    } catch {
+      return { ok: false, error: 'JSON inválido' };
+    }
+    const parsed = parseSuphoImportJson(json);
+    if (!parsed.ok) return { ok: false, error: parsed.error };
+    return { ok: true, kind: 'json', campaign_id: parsed.campaign_id, groups: parsed.groups };
+  }
+
+  if (isExcelFilename(name)) {
+    const rows = parseExcelToMatrix(buffer);
+    const parsed = parseSuphoImportMatrix(rows);
+    if (parsed.errors.length > 0) {
+      return { ok: false, error: parsed.errors.slice(0, 8).join(' | ') };
+    }
+    return { ok: true, kind: 'tabular', groups: parsed.groups };
+  }
+
+  const text = stripBom(buffer.toString('utf-8'));
+  const trimmed = text.trim();
+  if (trimmed.startsWith('{') && trimmed.includes('"campaign_id"')) {
+    try {
+      const json = JSON.parse(text) as unknown;
+      const parsed = parseSuphoImportJson(json);
+      if (parsed.ok) {
+        return { ok: true, kind: 'json', campaign_id: parsed.campaign_id, groups: parsed.groups };
+      }
+    } catch {
+      /* segue como tabular */
+    }
+  }
+
+  const withoutComments = stripCommentLines(text);
+  if (!withoutComments.trim()) {
+    return { ok: false, error: 'Arquivo vazio' };
+  }
+  const rows = parseFlexibleDelimited(withoutComments);
+  const parsed = parseSuphoImportMatrix(rows);
+  if (parsed.errors.length > 0) {
+    return { ok: false, error: parsed.errors.slice(0, 8).join(' | ') };
+  }
+  return { ok: true, kind: 'tabular', groups: parsed.groups };
 }
 
 const jsonSchema = z.object({

@@ -17,18 +17,26 @@ export default async function UploadsPage() {
   const orgId = await getOrgIdForUser(user.id);
   if (!orgId) {
     return (
-      <div className="flex items-center justify-center py-24 text-slate-500">
-        Carregando organização...
+      <div className="mx-auto max-w-lg rounded-xl border border-amber-200 bg-amber-50/80 px-6 py-8 text-center text-sm text-amber-950">
+        <p className="font-medium">Organização não disponível</p>
+        <p className="mt-2 text-amber-900/90">
+          Não foi possível carregar sua organização. Verifique se o PostgreSQL está acessível e se a variável{' '}
+          <code className="rounded bg-white/80 px-1.5 py-0.5 text-xs">DATABASE_URL</code> está definida no
+          servidor (veja <code className="text-xs">.env.example</code>).
+        </p>
       </div>
     );
   }
 
-  const { data: uploads } = await supabase
+  const { data: uploads, error: uploadsError } = await supabase
     .from('uploads')
     .select('id, filename, kind, status, error_message, created_at, processed_at')
     .eq('org_id', orgId)
     .order('created_at', { ascending: false })
     .limit(50);
+  if (uploadsError) {
+    console.error('[uploads/page] Falha ao listar uploads:', uploadsError.message);
+  }
   type UploadRow = { id: string; filename: string; kind: string; status: string; error_message: string | null; created_at: string; processed_at: string | null };
   const uploadRows = (uploads ?? []) as UploadRow[];
   const doneCount = uploadRows.filter((u) => u.status === 'done').length;

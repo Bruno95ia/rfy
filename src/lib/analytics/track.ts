@@ -9,7 +9,10 @@ export type TrackScreen =
   | 'supho_diagnostico'
   | 'supho_maturidade'
   | 'supho_paip'
-  | 'settings';
+  | 'settings'
+  | 'settings_contexto_organizacao'
+  | 'settings_context_pack'
+  | 'settings_conhecimento';
 
 export function trackScreen(screen: TrackScreen): void {
   if (typeof window === 'undefined') return;

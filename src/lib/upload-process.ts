@@ -1,21 +1,22 @@
 /**
- * Lógica compartilhada de processamento de upload (CSV → DB).
+ * Lógica compartilhada de processamento de upload (planilha → DB).
  * Usado pelos jobs Inngest e pelo fallback síncrono quando Inngest não está disponível.
  */
 import type { AdminDbClientType } from '@/lib/supabase/admin';
 import { parsePiperunCsv } from '@/lib/piperun/csv';
+import { parseUploadBufferToRows } from '@/lib/piperun/flexible-import';
+import { getObjectBuffer } from '@/lib/storage';
 import { normalizeOpportunityRow, normalizeActivityRow } from '@/lib/piperun/normalize';
 
-export async function processOpportunitiesCsv(
+export async function processOpportunitiesMatrix(
   admin: AdminDbClientType,
   orgId: string,
   uploadId: string,
-  csvBody: string
+  rows: string[][]
 ): Promise<{ inserted: number }> {
-  const rows = parsePiperunCsv(csvBody);
-  if (rows.length < 2) throw new Error('CSV de oportunidades vazio ou sem dados');
+  if (rows.length < 2) throw new Error('Arquivo vazio ou sem dados (cabeçalho + linhas)');
 
-  const headers = rows[0];
+  const headers = rows[0]!;
   const records = rows.slice(1);
   const toInsert: Array<{
     org_id: string;
@@ -81,16 +82,15 @@ export async function processOpportunitiesCsv(
   return { inserted: toInsert.length };
 }
 
-export async function processActivitiesCsv(
+export async function processActivitiesMatrix(
   admin: AdminDbClientType,
   orgId: string,
   uploadId: string,
-  csvBody: string
+  rows: string[][]
 ): Promise<{ inserted: number }> {
-  const rows = parsePiperunCsv(csvBody);
-  if (rows.length < 2) throw new Error('CSV de atividades vazio ou sem dados');
+  if (rows.length < 2) throw new Error('Arquivo vazio ou sem dados (cabeçalho + linhas)');
 
-  const headers = rows[0];
+  const headers = rows[0]!;
   const records = rows.slice(1);
   const toInsert: Array<{
     org_id: string;
@@ -156,6 +156,71 @@ export async function processActivitiesCsv(
     .eq('id', uploadId);
 
   return { inserted: toInsert.length };
+}
+
+export async function processOpportunitiesCsv(
+  admin: AdminDbClientType,
+  orgId: string,
+  uploadId: string,
+  csvBody: string
+): Promise<{ inserted: number }> {
+  const rows = parsePiperunCsv(csvBody);
+  return processOpportunitiesMatrix(admin, orgId, uploadId, rows);
+}
+
+export async function processActivitiesCsv(
+  admin: AdminDbClientType,
+  orgId: string,
+  uploadId: string,
+  csvBody: string
+): Promise<{ inserted: number }> {
+  const rows = parsePiperunCsv(csvBody);
+  return processActivitiesMatrix(admin, orgId, uploadId, rows);
+}
+
+export async function processOpportunitiesFromBuffer(
+  admin: AdminDbClientType,
+  orgId: string,
+  uploadId: string,
+  buffer: Buffer,
+  originalFilename: string
+): Promise<{ inserted: number }> {
+  const rows = parseUploadBufferToRows(buffer, originalFilename);
+  return processOpportunitiesMatrix(admin, orgId, uploadId, rows);
+}
+
+export async function processActivitiesFromBuffer(
+  admin: AdminDbClientType,
+  orgId: string,
+  uploadId: string,
+  buffer: Buffer,
+  originalFilename: string
+): Promise<{ inserted: number }> {
+  const rows = parseUploadBufferToRows(buffer, originalFilename);
+  return processActivitiesMatrix(admin, orgId, uploadId, rows);
+}
+
+/** Lê o arquivo no storage (texto ou Excel) e processa oportunidades. */
+export async function processOpportunitiesFromStorage(
+  admin: AdminDbClientType,
+  orgId: string,
+  uploadId: string,
+  storagePath: string,
+  originalFilename: string
+): Promise<{ inserted: number }> {
+  const buffer = await getObjectBuffer(storagePath);
+  return processOpportunitiesFromBuffer(admin, orgId, uploadId, buffer, originalFilename);
+}
+
+export async function processActivitiesFromStorage(
+  admin: AdminDbClientType,
+  orgId: string,
+  uploadId: string,
+  storagePath: string,
+  originalFilename: string
+): Promise<{ inserted: number }> {
+  const buffer = await getObjectBuffer(storagePath);
+  return processActivitiesFromBuffer(admin, orgId, uploadId, buffer, originalFilename);
 }
 
 /** Vincula atividades ao pipeline (company + title + pipeline) e retorna quantas foram vinculadas. */

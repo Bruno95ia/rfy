@@ -66,6 +66,7 @@ venv/
 # artefatos e temporários
 tmp/
 output/
+.next-standalone.log
 *.pid
 rfy-revenue-friction-engine@*
 

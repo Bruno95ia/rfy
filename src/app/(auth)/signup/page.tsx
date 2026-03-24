@@ -58,8 +58,8 @@ function SignupContent() {
   }
 
   return (
-    <main className="min-h-screen px-4 py-8 sm:px-6 lg:px-8">
-      <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-2xl items-center justify-center">
+    <main className="flex min-h-screen min-h-dvh w-full flex-col items-center justify-center bg-[var(--color-background)] px-4 py-10 sm:px-6">
+      <div className="mx-auto grid w-full max-w-lg place-items-center">
         <Card className="w-full max-w-lg border-[var(--color-border)] shadow-[var(--shadow-lg)]">
           <CardHeader className="space-y-3 text-center">
             <div className="mx-auto">
@@ -138,11 +138,11 @@ function SignupContent() {
                 </Link>
               </p>
               <Link
-                href="/"
+                href="/precos"
                 className="inline-flex items-center gap-1 text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
               >
                 <Undo2 className="h-3.5 w-3.5" aria-hidden />
-                Voltar para página inicial
+                Planos e preços
               </Link>
             </div>
           </CardContent>

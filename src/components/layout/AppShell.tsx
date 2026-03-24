@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -21,6 +21,8 @@ import {
   Plug,
   TrendingUp,
   Users,
+  Package,
+  Library,
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
@@ -72,9 +74,14 @@ const navItems: NavCategory[] = [
       { href: '/app/pessoas', label: 'Pessoas', icon: Users },
       { href: '/app/integracoes', label: 'Integrações', icon: Plug },
       { href: '/app/settings', label: 'Configurações', icon: Settings },
+      { href: '/app/settings/context-pack', label: 'Context Pack', icon: Package },
+      { href: '/app/settings/conhecimento', label: 'Conhecimento', icon: Library },
     ],
   },
 ];
+
+/** Itens do menu em lista plana (para resolver rota ativa com prefixos sobrepostos). */
+const flatNavItems = navItems.flatMap(({ items }) => items);
 
 function getInitials(email: string) {
   const part = email.split('@')[0] ?? '';
@@ -97,11 +104,16 @@ export function AppShell({
 }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const pathname = usePathname();
-  const activeItem =
-    navItems
-      .flatMap(({ items }) => items)
-      .find((item) => pathname === item.href || pathname.startsWith(item.href + '/')) ?? null;
+  const pathname = usePathname() ?? '';
+  /** Prefere a rota mais específica (ex.: /app/settings/conhecimento e não só /app/settings). */
+  const activeNavItem = useMemo(() => {
+    if (!pathname) return null;
+    const matches = flatNavItems.filter(
+      (item) => pathname === item.href || pathname.startsWith(`${item.href}/`)
+    );
+    if (matches.length === 0) return null;
+    return [...matches].sort((a, b) => b.href.length - a.href.length)[0] ?? null;
+  }, [pathname]);
 
   const isUploadsPage = pathname.startsWith('/app/uploads');
 
@@ -159,8 +171,7 @@ export function AppShell({
               )}
               <div className="space-y-0.5">
                 {items.map(({ href, label, icon: Icon }) => {
-                  const isActive =
-                    pathname === href || pathname.startsWith(href + '/');
+                  const isActive = activeNavItem?.href === href;
                   return (
                     <Link
                       key={href}
@@ -201,7 +212,7 @@ export function AppShell({
       </aside>
 
       {/* Main */}
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2 border-b border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-surface)_92%,transparent)] px-4 shadow-[var(--shadow-sm)] backdrop-blur-[12px] sm:gap-3 lg:px-6 dark:bg-[color-mix(in_srgb,var(--color-surface)_90%,transparent)]">
           <button
             type="button"
@@ -214,13 +225,13 @@ export function AppShell({
 
           <div className="min-w-0 flex-1 sm:hidden">
             <p className="truncate text-center text-sm font-semibold text-[var(--color-text)]">
-              {activeItem?.label ?? 'Painel'}
+              {activeNavItem?.label ?? 'Painel'}
             </p>
           </div>
 
           <div className="hidden min-w-0 flex-1 sm:block">
             <p className="truncate text-sm font-semibold leading-tight text-[var(--color-text)]">
-              {activeItem?.label ?? 'Painel'}
+              {activeNavItem?.label ?? 'Painel'}
             </p>
             <p className="mt-0.5 truncate text-xs text-[var(--color-text-muted)]">{orgName}</p>
           </div>
@@ -307,8 +318,8 @@ export function AppShell({
           </div>
         </header>
 
-        <main className="flex-1 px-4 py-6 lg:px-8 lg:py-8">
-          <div className="mx-auto w-full max-w-[1200px]">
+        <main className="min-h-0 flex-1 overflow-x-hidden px-4 py-6 lg:px-8 lg:py-8">
+          <div className="mx-auto w-full min-w-0 max-w-[1200px]">
             {children}
           </div>
         </main>

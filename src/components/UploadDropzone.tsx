@@ -27,8 +27,9 @@ export function UploadDropzone({
     async (files: FileList | null) => {
       if (!files?.length || disabled || loading) return;
       const file = files[0];
-      if (!file.name.endsWith('.csv')) {
-        setError('Apenas arquivos CSV são aceitos');
+      const okExt = /\.(csv|tsv|txt|xlsx|xls)$/i.test(file.name);
+      if (!okExt) {
+        setError('Use CSV, TSV, TXT ou Excel (.xlsx / .xls)');
         return;
       }
       if (file.size > MAX_FILE_SIZE_BYTES) {
@@ -71,7 +72,7 @@ export function UploadDropzone({
       <label className="cursor-pointer">
         <input
           type="file"
-          accept=".csv"
+          accept=".csv,.tsv,.txt,.xlsx,.xls,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
           className="hidden"
           disabled={disabled || loading}
           onChange={(e) => handleFiles(e.target.files)}
@@ -89,12 +90,12 @@ export function UploadDropzone({
               </div>
               <div className="text-center">
                 <span className="block text-sm font-medium text-slate-900">
-                  Arraste um CSV ou clique para selecionar
+                  Arraste uma planilha ou clique para selecionar
                 </span>
                 <span className="mt-1 block text-xs text-slate-500">
                   {kind === 'opportunities'
-                    ? 'Oportunidades (PipeRun)'
-                    : 'Atividades (PipeRun)'}
+                    ? 'Oportunidades — CSV/Excel do seu CRM (colunas reconhecidas automaticamente)'
+                    : 'Atividades — CSV/Excel do seu CRM (colunas reconhecidas automaticamente)'}
                 </span>
               </div>
             </>

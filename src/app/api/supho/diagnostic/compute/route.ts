@@ -1,14 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { computeDiagnosticResult } from '@/lib/supho/calculations';
+import {
+  computeDiagnosticResult,
+  computeGaps,
+  computeITSMO,
+  computeNivel,
+} from '@/lib/supho/calculations';
+import { buildOrgContextBundleText, truncateOrgContextForResultJson } from '@/lib/org/context-documents';
+import { appendKnowledgeFilesToBundle } from '@/lib/org/knowledge';
+import { assessSystemsMaturity, applyIpPenalty } from '@/lib/supho/systems-maturity';
 import type { SuphoQuestionAverage } from '@/types/supho';
 import { requireApiCampaignAccess } from '@/lib/auth';
 
 /**
  * POST /api/supho/diagnostic/compute
  * Body: { campaign_id: string }
- * Calcula IC, IH, IP, ITSMO, nível, gaps e subíndices a partir das respostas da campanha
+ * Calcula IC, IH, IP, ITSMO, nível, gaps e subíndices a partir das respostas da campanha,
+ * aplica ajuste de imaturidade de sistemas (CRM/ERP), incorpora documentos de contexto da org
  * e persiste em supho_diagnostic_results.
  */
 export async function POST(req: NextRequest) {
@@ -109,25 +118,72 @@ export async function POST(req: NextRequest) {
     const result = computeDiagnosticResult(questionAverages);
     const sampleSize = Math.max(...questionAverages.map((q) => q.count), 0);
 
+    const orgId = campaign.org_id;
+    const [{ data: crmRows }, { data: cfgRow }, { data: ctxRows }] = await Promise.all([
+      admin.from('crm_integrations').select('id').eq('org_id', orgId).eq('is_active', true).limit(1),
+      admin.from('org_config').select('erp_integration_status').eq('org_id', orgId).maybeSingle(),
+      admin.from('org_context_documents').select('doc_key, body_markdown').eq('org_id', orgId),
+    ]);
+
+    const hasActiveCrmIntegration = Array.isArray(crmRows) && crmRows.length > 0;
+    const erpRaw = cfgRow && typeof cfgRow === 'object' && 'erp_integration_status' in cfgRow
+      ? String((cfgRow as { erp_integration_status?: string }).erp_integration_status ?? 'unknown')
+      : 'unknown';
+    const erpIntegrationStatus =
+      erpRaw === 'integrated' || erpRaw === 'not_integrated' ? erpRaw : 'unknown';
+
+    const systemsAssessment = assessSystemsMaturity({
+      hasActiveCrmIntegration,
+      erpIntegrationStatus,
+    });
+    const ipAdjusted = applyIpPenalty(result.ip, systemsAssessment.ipPenalty);
+    const itsmoAdjusted = computeITSMO(result.ic, result.ih, ipAdjusted);
+    const nivelAdjusted = computeNivel(itsmoAdjusted);
+    const gapsAdjusted = computeGaps(result.ic, result.ih, ipAdjusted);
+
+    const ctxForBundle = (ctxRows ?? []) as Array<{ doc_key: string; body_markdown: string | null }>;
+    let bundle = buildOrgContextBundleText(ctxForBundle);
+    bundle = await appendKnowledgeFilesToBundle(admin, orgId, campaignId, bundle);
+    const orgContextSummary = truncateOrgContextForResultJson(bundle);
+
+    const resultJson = {
+      questionAverages: result.questionAverages,
+      seed: null,
+      indicesFromSurvey: {
+        ic: result.ic,
+        ih: result.ih,
+        ip: result.ip,
+        itsmo: result.itsmo,
+        nivel: result.nivel,
+        gapCH: result.gapCH,
+        gapCP: result.gapCP,
+      },
+      systemsMaturity: {
+        hasActiveCrmIntegration: systemsAssessment.hasActiveCrmIntegration,
+        erpIntegrationStatus: systemsAssessment.erpIntegrationStatus,
+        ipPenaltyApplied: systemsAssessment.ipPenalty,
+        reasons: systemsAssessment.reasons,
+      },
+      orgContextPresent: bundle.trim().length > 0,
+      orgContextSummary: orgContextSummary || null,
+    };
+
     const { error: insertError } = await admin.from('supho_diagnostic_results').insert({
       org_id: campaign.org_id,
       campaign_id: campaignId,
       computed_at: new Date().toISOString(),
       ic: result.ic,
       ih: result.ih,
-      ip: result.ip,
-      itsmo: result.itsmo,
-      nivel: result.nivel,
-      gap_c_h: result.gapCH,
-      gap_c_p: result.gapCP,
+      ip: ipAdjusted,
+      itsmo: itsmoAdjusted,
+      nivel: nivelAdjusted,
+      gap_c_h: gapsAdjusted.gapCH,
+      gap_c_p: gapsAdjusted.gapCP,
       ise: result.ise,
       ipt: result.ipt,
       icl: result.icl,
       sample_size: sampleSize,
-      result_json: {
-        questionAverages: result.questionAverages,
-        seed: null,
-      },
+      result_json: resultJson,
     });
 
     if (insertError) {
@@ -142,15 +198,18 @@ export async function POST(req: NextRequest) {
       result: {
         ic: result.ic,
         ih: result.ih,
-        ip: result.ip,
-        itsmo: result.itsmo,
-        nivel: result.nivel,
-        gapCH: result.gapCH,
-        gapCP: result.gapCP,
+        ip: ipAdjusted,
+        itsmo: itsmoAdjusted,
+        nivel: nivelAdjusted,
+        gapCH: gapsAdjusted.gapCH,
+        gapCP: gapsAdjusted.gapCP,
         ise: result.ise,
         ipt: result.ipt,
         icl: result.icl,
         sampleSize,
+        indicesFromSurvey: resultJson.indicesFromSurvey,
+        systemsMaturity: resultJson.systemsMaturity,
+        orgContextPresent: resultJson.orgContextPresent,
       },
     });
   } catch (e) {

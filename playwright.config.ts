@@ -22,11 +22,13 @@ export default defineConfig({
     {
       name: 'demo-video',
       testMatch: /demo-rfy-video\.spec\.ts/,
+      timeout: 1_200_000,
       use: {
         ...devices['Desktop Chrome'],
         video: 'on',
         viewport: { width: 1280, height: 720 },
-        launchOptions: { slowMo: 70 },
+        /** Gravação mais lenta para narrar e acompanhar resultados no ecrã */
+        launchOptions: { slowMo: 220 },
       },
     },
   ],

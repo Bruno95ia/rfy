@@ -128,7 +128,7 @@ export function SuphoExternalImportForm({ orgId }: Props) {
       <div className="grid gap-3 text-xs text-slate-500 sm:grid-cols-3">
         <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
           <FileSpreadsheet className="h-4 w-4 text-indigo-500" />
-          CSV longo: respondent, question_id, value
+          Planilha (CSV, TSV, Excel…): respondent, question_id, value
         </div>
         <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
           <FileJson className="h-4 w-4 text-indigo-500" />
@@ -154,12 +154,13 @@ export function SuphoExternalImportForm({ orgId }: Props) {
         <input
           name="file"
           type="file"
-          accept=".csv,.json,text/csv,application/json"
+          accept="*/*"
           disabled={loading || uploadBlocked}
           className="block w-full text-sm text-slate-600 file:mr-4 file:rounded-lg file:border-0 file:bg-indigo-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-indigo-700 hover:file:bg-indigo-100 disabled:opacity-50"
         />
         <p className="mt-3 text-xs text-slate-500">
-          Exporte de Typeform, Google Forms ou outra ferramenta e ajuste colunas para o modelo. Perguntas:{' '}
+          Qualquer arquivo de texto ou Excel com colunas reconhecíveis (aliases em PT/EN). JSON no formato da
+          API. Perguntas:{' '}
           <a href="/api/supho/questions" className="text-indigo-600 hover:underline" target="_blank" rel="noreferrer">
             /api/supho/questions
           </a>

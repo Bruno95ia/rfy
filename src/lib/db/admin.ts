@@ -4,7 +4,7 @@
  * Retorno sempre { data, error } (e opcionalmente count para select com count: 'exact', head: true).
  */
 
-import { getPool } from '@/lib/db';
+import { getPoolOrNull, DB_UNAVAILABLE_MESSAGE } from '@/lib/db';
 import type { QueryResultRow } from 'pg';
 
 export type DbError = { message: string };
@@ -51,6 +51,8 @@ const allowedTableNames = new Set([
   'activities', 'reports', 'plans', 'usage_limits', 'usage_events', 'alert_channels', 'alert_rules',
   'alert_events', 'alerts', 'outbound_webhooks', 'report_schedules', 'data_quality_runs',
   'forecast_scenarios', 'quarterly_goals', 'retention_cohorts', 'crm_integrations',
+  'org_context_documents',
+  'org_knowledge_files',
   'supho_campaigns',
   'supho_diagnostic_campaigns',
   'supho_respondents',
@@ -81,6 +83,7 @@ export interface StorageApi {
   from(bucket: string): {
     upload(path: string, body: Buffer | Blob, opts?: { contentType?: string; upsert?: boolean }): Promise<{ error: DbError | null }>;
     download(path: string): Promise<{ data: Blob | null; error: DbError | null }>;
+    remove(paths: string[]): Promise<{ error: DbError | null }>;
   };
 }
 
@@ -89,8 +92,6 @@ export type AdminDbClientType = InstanceType<typeof AdminDbClient>;
 
 /** Admin client: from(table) + storage (fallback filesystem quando UPLOAD_DIR está definido). */
 export class AdminDbClient {
-  private pool = getPool();
-
   from<T extends QueryResultRow = QueryResultRow>(table: string): QueryBuilder<T> & {
     insert(rowOrRows: Record<string, unknown> | Record<string, unknown>[]): InsertBuilder<T>;
     update(row: Record<string, unknown>): UpdateBuilder;
@@ -98,6 +99,7 @@ export class AdminDbClient {
     delete(): QueryBuilder<T> & PromiseLike<DeleteResult>;
   } {
     const t = safeTable(table);
+    const dbErr = (): DbError => ({ message: DB_UNAVAILABLE_MESSAGE });
     let selectCols: string | null = null;
     let countOnly = false;
     let headOnly = false;
@@ -114,10 +116,46 @@ export class AdminDbClient {
     let upsertOpts: { onConflict?: string; ignoreDuplicates?: boolean } | null = null;
 
     const runSelect = async (): Promise<{ data: T[] | null; error: DbError | null; count?: number }> => {
-      if (countOnly && headOnly) {
+      try {
+        const pool = getPoolOrNull();
+        if (!pool) {
+          return { data: null, error: dbErr() };
+        }
+        if (countOnly && headOnly) {
+          const cols = selectCols || '*';
+          const sel = cols === '*' ? 'count(*)' : `count(${safeColumn(cols.split(',')[0].trim())})`;
+          let sql = `SELECT ${sel}::int AS count FROM ${t}`;
+          const params: unknown[] = [];
+          let idx = 1;
+          for (const c of conditions) {
+            const prefix = params.length === 0 ? ' WHERE ' : ' AND ';
+            if (c.type === 'eq') {
+              sql += `${prefix}${safeColumn(c.col)} = $${idx}`;
+              params.push(c.val);
+              idx++;
+            } else if (c.type === 'gte') {
+              sql += `${prefix}${safeColumn(c.col)} >= $${idx}`;
+              params.push(c.val);
+              idx++;
+            } else if (c.type === 'in') {
+              sql += `${prefix}${safeColumn(c.col)}::text = ANY($${idx}::text[])`;
+              params.push(Array.isArray(c.val) ? c.val : [c.val]);
+              idx++;
+            } else if (c.type === 'ilike') {
+              sql += `${prefix}${safeColumn(c.col)} ILIKE $${idx}`;
+              params.push(c.val);
+              idx++;
+            } else if (c.type === 'is' && c.val === null) {
+              sql += `${prefix}${safeColumn(c.col)} IS NULL`;
+            } else if (c.type === 'not_null') {
+              sql += `${prefix}${safeColumn(c.col)} IS NOT NULL`;
+            }
+          }
+          const r = await pool.query<{ count: number }>(sql, params);
+          return { data: null, error: null, count: r.rows[0]?.count ?? 0 };
+        }
         const cols = selectCols || '*';
-        const sel = cols === '*' ? 'count(*)' : `count(${safeColumn(cols.split(',')[0].trim())})`;
-        let sql = `SELECT ${sel}::int AS count FROM ${t}`;
+        let sql = `SELECT ${cols} FROM ${t}`;
         const params: unknown[] = [];
         let idx = 1;
         for (const c of conditions) {
@@ -144,77 +182,54 @@ export class AdminDbClient {
             sql += `${prefix}${safeColumn(c.col)} IS NOT NULL`;
           }
         }
-        const r = await this.pool.query<{ count: number }>(sql, params);
-        return { data: null, error: null, count: r.rows[0]?.count ?? 0 };
-      }
-      const cols = selectCols || '*';
-      let sql = `SELECT ${cols} FROM ${t}`;
-      const params: unknown[] = [];
-      let idx = 1;
-      for (const c of conditions) {
-        const prefix = params.length === 0 ? ' WHERE ' : ' AND ';
-        if (c.type === 'eq') {
-          sql += `${prefix}${safeColumn(c.col)} = $${idx}`;
-          params.push(c.val);
-          idx++;
-        } else if (c.type === 'gte') {
-          sql += `${prefix}${safeColumn(c.col)} >= $${idx}`;
-          params.push(c.val);
-          idx++;
-        } else if (c.type === 'in') {
-            sql += `${prefix}${safeColumn(c.col)}::text = ANY($${idx}::text[])`;
-            params.push(Array.isArray(c.val) ? c.val : [c.val]);
-            idx++;
-          } else if (c.type === 'ilike') {
-            sql += `${prefix}${safeColumn(c.col)} ILIKE $${idx}`;
-            params.push(c.val);
-            idx++;
-          } else if (c.type === 'is' && c.val === null) {
-            sql += `${prefix}${safeColumn(c.col)} IS NULL`;
-          } else if (c.type === 'not_null') {
-            sql += `${prefix}${safeColumn(c.col)} IS NOT NULL`;
+        if (orderCol) sql += ` ORDER BY ${safeColumn(orderCol)} ${orderAsc ? 'ASC' : 'DESC'}`;
+        if (offsetVal != null && offsetVal > 0) sql += ` OFFSET ${offsetVal}`;
+        if (limitVal != null) sql += ` LIMIT ${Math.max(1, Math.min(limitVal, 1000))}`;
+        let count: number | undefined;
+        if (countExact) {
+          let countSql = `SELECT count(*)::int AS c FROM ${t}`;
+          const countParams: unknown[] = [];
+          let ci = 1;
+          for (const c of conditions) {
+            const prefix = countParams.length === 0 ? ' WHERE ' : ' AND ';
+            if (c.type === 'eq') {
+              countSql += `${prefix}${safeColumn(c.col)} = $${ci}`;
+              countParams.push(c.val);
+              ci++;
+            } else if (c.type === 'gte') {
+              countSql += `${prefix}${safeColumn(c.col)} >= $${ci}`;
+              countParams.push(c.val);
+              ci++;
+            } else if (c.type === 'in') {
+              countSql += `${prefix}${safeColumn(c.col)}::text = ANY($${ci}::text[])`;
+              countParams.push(Array.isArray(c.val) ? c.val : [c.val]);
+              ci++;
+            } else if (c.type === 'ilike') {
+              countSql += `${prefix}${safeColumn(c.col)} ILIKE $${ci}`;
+              countParams.push(c.val);
+              ci++;
+            } else if (c.type === 'is' && c.val === null) {
+              countSql += `${prefix}${safeColumn(c.col)} IS NULL`;
+            } else if (c.type === 'not_null') {
+              countSql += `${prefix}${safeColumn(c.col)} IS NOT NULL`;
+            }
           }
+          const cr = await pool.query<{ c: number }>(countSql, countParams);
+          count = cr.rows[0]?.c ?? 0;
         }
-      if (orderCol) sql += ` ORDER BY ${safeColumn(orderCol)} ${orderAsc ? 'ASC' : 'DESC'}`;
-      if (offsetVal != null && offsetVal > 0) sql += ` OFFSET ${offsetVal}`;
-      if (limitVal != null) sql += ` LIMIT ${Math.max(1, Math.min(limitVal, 1000))}`;
-      let count: number | undefined;
-      if (countExact) {
-        let countSql = `SELECT count(*)::int AS c FROM ${t}`;
-        const countParams: unknown[] = [];
-        let ci = 1;
-        for (const c of conditions) {
-          const prefix = countParams.length === 0 ? ' WHERE ' : ' AND ';
-          if (c.type === 'eq') {
-            countSql += `${prefix}${safeColumn(c.col)} = $${ci}`;
-            countParams.push(c.val);
-            ci++;
-          } else if (c.type === 'gte') {
-            countSql += `${prefix}${safeColumn(c.col)} >= $${ci}`;
-            countParams.push(c.val);
-            ci++;
-          } else if (c.type === 'in') {
-            countSql += `${prefix}${safeColumn(c.col)}::text = ANY($${ci}::text[])`;
-            countParams.push(Array.isArray(c.val) ? c.val : [c.val]);
-            ci++;
-          } else if (c.type === 'ilike') {
-            countSql += `${prefix}${safeColumn(c.col)} ILIKE $${ci}`;
-            countParams.push(c.val);
-            ci++;
-          } else if (c.type === 'is' && c.val === null) {
-            countSql += `${prefix}${safeColumn(c.col)} IS NULL`;
-          } else if (c.type === 'not_null') {
-            countSql += `${prefix}${safeColumn(c.col)} IS NOT NULL`;
-          }
-        }
-        const cr = await this.pool.query<{ c: number }>(countSql, countParams);
-        count = cr.rows[0]?.c ?? 0;
+        const r = await pool.query<T>(sql, params);
+        return { data: r.rows, error: null, count };
+      } catch (e) {
+        return {
+          data: null,
+          error: { message: e instanceof Error ? e.message : String(e) },
+        };
       }
-      const r = await this.pool.query<T>(sql, params);
-      return { data: r.rows, error: null, count };
     };
 
     const runInsert = async (): Promise<{ data: T | T[] | null; error: DbError | null }> => {
+      const pool = getPoolOrNull();
+      if (!pool) return { data: null, error: dbErr() };
       if (!insertRow) return { data: null, error: { message: 'No insert row' } };
       const keys = Object.keys(insertRow).map((k) => safeColumn(k));
       const cols = keys.join(', ');
@@ -223,7 +238,7 @@ export class AdminDbClient {
       let sql = `INSERT INTO ${t} (${cols}) VALUES (${placeholders})`;
       if (selectCols) sql += ` RETURNING ${selectCols}`;
       try {
-        const r = await this.pool.query<T>(sql, values);
+        const r = await pool.query<T>(sql, values);
         if (selectCols && r.rows[0]) return { data: r.rows[0], error: null };
         return { data: r.rows.length ? r.rows : null, error: null };
       } catch (e) {
@@ -232,6 +247,8 @@ export class AdminDbClient {
     };
 
     const runInsertMany = async (rows: Record<string, unknown>[]): Promise<{ data: T | T[] | null; error: DbError | null }> => {
+      const pool = getPoolOrNull();
+      if (!pool) return { data: null, error: dbErr() };
       if (rows.length === 0) return { data: null, error: null };
       const keys = Object.keys(rows[0]).map((k) => safeColumn(k));
       const cols = keys.join(', ');
@@ -239,7 +256,7 @@ export class AdminDbClient {
       const values = rows.flatMap((row) => keys.map((k) => row[k]));
       const sql = `INSERT INTO ${t} (${cols}) VALUES (${placeholders})`;
       try {
-        await this.pool.query(sql, values);
+        await pool.query(sql, values);
         return { data: null, error: null };
       } catch (e) {
         return { data: null, error: { message: e instanceof Error ? e.message : String(e) } };
@@ -247,6 +264,8 @@ export class AdminDbClient {
     };
 
     const runUpdate = async (): Promise<{ data: unknown; error: DbError | null }> => {
+      const pool = getPoolOrNull();
+      if (!pool) return { data: null, error: dbErr() };
       if (!updateRow) return { data: null, error: { message: 'No update row' } };
       const setKeys = Object.keys(updateRow).filter((k) => updateRow![k] !== undefined);
       if (setKeys.length === 0) return { data: null, error: null };
@@ -267,7 +286,7 @@ export class AdminDbClient {
         }
       }
       try {
-        await this.pool.query(sql, params);
+        await pool.query(sql, params);
         return { data: null, error: null };
       } catch (e) {
         return { data: null, error: { message: e instanceof Error ? e.message : String(e) } };
@@ -275,6 +294,8 @@ export class AdminDbClient {
     };
 
     const runUpsert = async (): Promise<{ data: unknown; error: DbError | null }> => {
+      const pool = getPoolOrNull();
+      if (!pool) return { data: null, error: dbErr() };
       if (!upsertRow) return { data: null, error: { message: 'No upsert row' } };
       const keys = Object.keys(upsertRow).map((k) => safeColumn(k));
       const cols = keys.join(', ');
@@ -291,7 +312,7 @@ export class AdminDbClient {
           : 'DO NOTHING';
       const sql = `INSERT INTO ${t} (${cols}) VALUES (${placeholders}) ON CONFLICT (${conflictColList}) ${doUpdate}`;
       try {
-        await this.pool.query(sql, values);
+        await pool.query(sql, values);
         return { data: null, error: null };
       } catch (e) {
         return { data: null, error: { message: e instanceof Error ? e.message : String(e) } };
@@ -299,6 +320,8 @@ export class AdminDbClient {
     };
 
     const runUpsertMany = async (rows: Record<string, unknown>[]): Promise<{ data: unknown; error: DbError | null }> => {
+      const pool = getPoolOrNull();
+      if (!pool) return { data: null, error: dbErr() };
       if (rows.length === 0) return { data: null, error: null };
       const keys = Object.keys(rows[0]).map((k) => safeColumn(k));
       const cols = keys.join(', ');
@@ -315,7 +338,7 @@ export class AdminDbClient {
       const values = rows.flatMap((row) => keys.map((k) => row[k]));
       const sql = `INSERT INTO ${t} (${cols}) VALUES (${placeholders}) ON CONFLICT (${conflictColList}) ${doUpdate}`;
       try {
-        await this.pool.query(sql, values);
+        await pool.query(sql, values);
         return { data: null, error: null };
       } catch (e) {
         return { data: null, error: { message: e instanceof Error ? e.message : String(e) } };
@@ -323,6 +346,8 @@ export class AdminDbClient {
     };
 
     const runDelete = async (): Promise<{ data: unknown; error: DbError | null }> => {
+      const pool = getPoolOrNull();
+      if (!pool) return { data: null, error: dbErr() };
       let sql = `DELETE FROM ${t}`;
       const params: unknown[] = [];
       let idx = 1;
@@ -332,7 +357,7 @@ export class AdminDbClient {
         idx++;
       }
       try {
-        await this.pool.query(sql, params);
+        await pool.query(sql, params);
         return { data: null, error: null };
       } catch (e) {
         return { data: null, error: { message: e instanceof Error ? e.message : String(e) } };
@@ -493,8 +518,8 @@ function createStorageApi(): StorageApi {
           body: Buffer | Blob,
           opts?: { contentType?: string; upsert?: boolean }
         ): Promise<{ error: DbError | null }> {
-          if (bucket !== 'uploads') {
-            return { error: { message: 'Storage bucket não suportado sem Supabase. Use UPLOAD_DIR para fallback local.' } };
+          if (bucket !== 'uploads' && bucket !== 'knowledge') {
+            return { error: { message: 'Bucket não suportado. Use uploads ou knowledge com UPLOAD_DIR.' } };
           }
           if (!uploadDir) {
             return { error: { message: 'UPLOAD_DIR não configurado. Defina para salvar uploads em disco (ou use Supabase Storage).' } };
@@ -523,6 +548,25 @@ function createStorageApi(): StorageApi {
             return { data: new Blob([buf]), error: null };
           } catch (e) {
             return { data: null, error: { message: e instanceof Error ? e.message : String(e) } };
+          }
+        },
+        async remove(paths: string[]): Promise<{ error: DbError | null }> {
+          if (bucket !== 'uploads' && bucket !== 'knowledge') {
+            return { error: { message: 'Bucket não suportado.' } };
+          }
+          if (!uploadDir) {
+            return { error: { message: 'UPLOAD_DIR não configurado' } };
+          }
+          try {
+            const fs = await import('node:fs/promises');
+            const pathMod = await import('node:path');
+            for (const p of paths) {
+              const fullPath = pathMod.join(uploadDir, p);
+              await fs.unlink(fullPath).catch(() => {});
+            }
+            return { error: null };
+          } catch (e) {
+            return { error: { message: e instanceof Error ? e.message : String(e) } };
           }
         },
       };

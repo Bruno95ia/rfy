@@ -188,6 +188,7 @@ export interface Database {
           top_evidencias_por_friccao: number | null;
           timezone: string | null;
           updated_at: string | null;
+          erp_integration_status?: 'unknown' | 'integrated' | 'not_integrated';
         };
         Insert: {
           org_id: string;
@@ -203,8 +204,53 @@ export interface Database {
           top_evidencias_por_friccao?: number | null;
           timezone?: string | null;
           updated_at?: string | null;
+          erp_integration_status?: 'unknown' | 'integrated' | 'not_integrated';
         };
         Update: Partial<Database['public']['Tables']['org_config']['Insert']>;
+      };
+      org_context_documents: {
+        Row: {
+          org_id: string;
+          doc_key: string;
+          title: string | null;
+          body_markdown: string;
+          updated_at: string;
+        };
+        Insert: {
+          org_id: string;
+          doc_key: string;
+          title?: string | null;
+          body_markdown?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database['public']['Tables']['org_context_documents']['Insert']>;
+      };
+      org_knowledge_files: {
+        Row: {
+          id: string;
+          org_id: string;
+          campaign_id: string | null;
+          filename: string;
+          storage_path: string;
+          mime_type: string | null;
+          size_bytes: number | null;
+          label: string | null;
+          created_at: string;
+          created_by_user_id: string | null;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          campaign_id?: string | null;
+          filename: string;
+          storage_path: string;
+          mime_type?: string | null;
+          size_bytes?: number | null;
+          label?: string | null;
+          created_at?: string;
+          created_by_user_id?: string | null;
+        };
+        Update: Partial<Database['public']['Tables']['org_knowledge_files']['Insert']>;
       };
       crm_integrations: {
         Row: {

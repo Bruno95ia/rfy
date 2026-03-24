@@ -28,7 +28,10 @@ import {
   Mail,
   UserMinus,
   XCircle,
+  FileText,
+  Library,
 } from 'lucide-react';
+import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -597,6 +600,28 @@ export function SettingsClient() {
           </div>
         </div>
       )}
+      <div className="space-y-2">
+        <Link
+          href="/app/settings/contexto-organizacao"
+          className="flex min-h-[3.25rem] items-center justify-between gap-3 rounded-xl border border-indigo-100 bg-indigo-50/60 px-4 py-3 text-sm text-indigo-950 transition hover:bg-indigo-50"
+        >
+          <span className="flex min-w-0 flex-1 items-start gap-2.5 font-medium leading-snug">
+            <FileText className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600" aria-hidden />
+            <span>Contexto da organização (texto / Markdown para o diagnóstico SUPHO)</span>
+          </span>
+          <span className="shrink-0 text-indigo-600">Abrir →</span>
+        </Link>
+        <Link
+          href="/app/settings/conhecimento"
+          className="flex min-h-[3.25rem] items-center justify-between gap-3 rounded-xl border border-indigo-100 bg-indigo-50/60 px-4 py-3 text-sm text-indigo-950 transition hover:bg-indigo-50"
+        >
+          <span className="flex min-w-0 flex-1 items-start gap-2.5 font-medium leading-snug">
+            <Library className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600" aria-hidden />
+            <span>Repositório Conhecimento (upload de documentos para o contexto)</span>
+          </span>
+          <span className="shrink-0 text-indigo-600">Abrir →</span>
+        </Link>
+      </div>
       <Card>
         <CardContent className="space-y-4 pt-6">
           <div className="flex flex-wrap items-center gap-2">

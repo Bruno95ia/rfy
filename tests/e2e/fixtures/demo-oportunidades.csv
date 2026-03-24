@@ -1,0 +1,7 @@
+Hash;Funil;Etapa;Lead-Timing da etapa;Dono da oportunidade;Nome do dono da oportunidade;Nome fantasia (Empresa);Titulo;Valor de P&S;Data de cadastro;Data de fechamento;Status;Tags
+opp-001;Enterprise;Proposta;19;ana@empresa.com;Ana Silva;Atlas Energia;Expansao Nacional;420000;01/01/2025;;Aberta;
+opp-002;Enterprise;Proposta;16;ana@empresa.com;Ana Silva;Norte Pharma;Plataforma Comercial;280000;15/01/2025;;Aberta;
+opp-003;Mid-Market;Negociacao;11;bruno@empresa.com;Bruno Lima;Sigma Log;Rollout Filiais;360000;20/01/2025;;Aberta;
+opp-004;Mid-Market;Negociacao;8;carla@empresa.com;Carla Souza;Delta Foods;Otimizacao RevenueOps;240000;25/01/2025;;Aberta;
+opp-005;SMB;Qualificacao;6;carla@empresa.com;Carla Souza;Zen Motors;Expansao Inside Sales;130000;01/02/2025;;Aberta;
+opp-006;SMB;Fechado;2;bruno@empresa.com;Bruno Lima;Kappa Medical;Renovacao Contrato;175000;10/02/2025;15/02/2025;Ganha;

@@ -2,6 +2,20 @@ import { getCurrentUser } from '@/lib/auth-session';
 import { redirect } from 'next/navigation';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
+import { DB_UNAVAILABLE_MESSAGE } from '@/lib/db';
+
+function isRecoverableAdminError(err: { message: string } | null | undefined): boolean {
+  if (!err?.message) return false;
+  const m = err.message;
+  return (
+    m === DB_UNAVAILABLE_MESSAGE ||
+    m.includes('Base de dados não configurada') ||
+    m.includes('ECONNREFUSED') ||
+    m.includes('ETIMEDOUT') ||
+    m.includes('ENOTFOUND') ||
+    m.includes('timeout')
+  );
+}
 
 export type OrgRole = 'owner' | 'admin' | 'manager' | 'viewer';
 const ROLE_WEIGHT: Record<OrgRole, number> = {
@@ -78,6 +92,10 @@ export async function provisionOrgOnFirstLogin(userId: string) {
     .limit(1)) as { data: { org_id: string }[] | null; error: { message: string } | null };
 
   if (membersError) {
+    if (isRecoverableAdminError(membersError)) {
+      console.warn('[provisionOrgOnFirstLogin]', membersError.message);
+      return;
+    }
     throw new Error('Falha ao consultar membros: ' + membersError.message);
   }
 
@@ -95,6 +113,10 @@ export async function provisionOrgOnFirstLogin(userId: string) {
   const orgError = orgResult.error;
 
   if (orgError || !org) {
+    if (orgError && isRecoverableAdminError(orgError)) {
+      console.warn('[provisionOrgOnFirstLogin]', orgError.message);
+      return;
+    }
     throw new Error('Falha ao criar org: ' + (orgError?.message ?? 'unknown'));
   }
 
@@ -110,6 +132,10 @@ export async function provisionOrgOnFirstLogin(userId: string) {
   );
 
   if (memberUpsert.error) {
+    if (isRecoverableAdminError(memberUpsert.error)) {
+      console.warn('[provisionOrgOnFirstLogin]', memberUpsert.error.message);
+      return;
+    }
     throw new Error('Falha ao adicionar membro: ' + memberUpsert.error.message);
   }
 
@@ -122,6 +148,10 @@ export async function provisionOrgOnFirstLogin(userId: string) {
   if (!roleErr || isMissingRoleColumnError(roleErr.message)) {
     return org.id;
   }
+  if (isRecoverableAdminError(roleErr)) {
+    console.warn('[provisionOrgOnFirstLogin]', roleErr.message);
+    return org.id;
+  }
 
   throw new Error('Falha ao definir role do membro: ' + roleErr.message);
 }
@@ -131,11 +161,12 @@ export async function provisionOrgOnFirstLogin(userId: string) {
  */
 export async function getOrgIdForUser(userId: string): Promise<string | null> {
   const admin = createAdminClient();
-  const { data } = (await admin
+  const { data, error } = (await admin
     .from('org_members')
     .select('org_id')
     .eq('user_id', userId)
-    .limit(1)) as { data: { org_id: string }[] | null };
+    .limit(1)) as { data: { org_id: string }[] | null; error: { message: string } | null };
+  if (error) return null;
   return data?.[0]?.org_id ?? null;
 }
 

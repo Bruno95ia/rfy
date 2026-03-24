@@ -59,8 +59,28 @@ async function main() {
     process.exit(1);
   }
 
-  const clientConfig = { connectionString: DATABASE_URL };
-  if (DATABASE_URL.includes('sslmode=require') || DATABASE_URL.includes('ssl=true')) {
+  const isLocalPg =
+    /@[^/]*(localhost|127\.0\.0\.1)\b/.test(DATABASE_URL) ||
+    DATABASE_URL.includes('@host.docker.internal');
+  const useSslRelaxed =
+    !isLocalPg ||
+    DATABASE_URL.includes('sslmode=require') ||
+    DATABASE_URL.includes('sslmode=prefer') ||
+    DATABASE_URL.includes('ssl=true');
+  /** Evita conflito entre sslmode na URI e `ssl` explícito (RDS / cloud). */
+  let connectionString = DATABASE_URL;
+  if (useSslRelaxed && !isLocalPg) {
+    const q = DATABASE_URL.indexOf('?');
+    if (q >= 0) {
+      const base = DATABASE_URL.slice(0, q);
+      const sp = new URLSearchParams(DATABASE_URL.slice(q + 1));
+      sp.delete('sslmode');
+      const rest = sp.toString();
+      connectionString = rest ? `${base}?${rest}` : base;
+    }
+  }
+  const clientConfig = { connectionString };
+  if (useSslRelaxed) {
     clientConfig.ssl = { rejectUnauthorized: false };
   }
   const client = new Client(clientConfig);

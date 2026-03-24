@@ -58,8 +58,8 @@ export function LoginForm() {
   }
 
   return (
-    <section className="flex items-center justify-center rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-[var(--shadow-md)] sm:p-6">
-      <Card className="w-full max-w-md border-0 shadow-none">
+    <section className="w-full">
+      <Card className="w-full border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-md)]">
         <CardHeader className="space-y-2 pb-4 text-center sm:text-left">
           <div className="mx-auto sm:mx-0 lg:hidden">
             <Logo variant="primary" size={38} />
@@ -151,11 +151,11 @@ export function LoginForm() {
               Usar credenciais demo
             </button>
             <Link
-              href="/"
+              href="/precos"
               className="inline-flex items-center gap-1 text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
             >
               <Undo2 className="h-3.5 w-3.5" aria-hidden />
-              Voltar para página inicial
+              Planos e preços
             </Link>
           </div>
         </CardContent>

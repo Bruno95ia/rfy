@@ -10,7 +10,9 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN npm run build
+RUN npm run build \
+  && test -f .next/server/app/app/settings/conhecimento/page.js \
+  && echo "OK: rota /app/settings/conhecimento presente no build"
 
 FROM base AS runner
 WORKDIR /app

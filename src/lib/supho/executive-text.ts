@@ -4,6 +4,7 @@
  */
 
 import type { SuphoNivel } from '@/types/supho';
+import type { SystemsMaturityAssessment } from '@/lib/supho/systems-maturity';
 
 /** Leitura executiva por nível ITSMO (1–5) — base para resumo do diagnóstico */
 const TEXTS_ITSMO: Record<SuphoNivel, string> = {
@@ -153,4 +154,23 @@ export function getPerfilPredominante(ic: number, ih: number, ip: number): Supho
 
 export function getExecutiveTextPerfil(perfil: SuphoPerfilMessage): string {
   return PERFIL_MESSAGES[perfil] ?? '';
+}
+
+/** Parágrafo sobre imaturidade de sistemas (CRM/ERP) no diagnóstico */
+export function getSystemsMaturityNarrative(assessment: SystemsMaturityAssessment): string {
+  if (assessment.ipPenalty <= 0) {
+    return 'Integração de sistemas: CRM ativo no RFY e/ou ERP declarado como integrado — base adequada para dados de pipeline e governança.';
+  }
+  const intro =
+    'Além das respostas do questionário, o sistema considerou sinais de maturidade de dados e sistemas: ';
+  return intro + assessment.reasons.join(' ');
+}
+
+/** Texto de apoio quando há documentos de contexto organizacional preenchidos */
+export function getOrgContextNarrative(summary: string | null | undefined): string {
+  const t = (summary ?? '').trim();
+  if (!t) {
+    return 'Contexto documental da organização ainda não foi preenchido no RFY. Completar em Configurações → Contexto da organização enriquece o diagnóstico.';
+  }
+  return 'Contexto organizacional registrado (para referência do diagnóstico):\n\n' + t;
 }

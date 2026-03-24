@@ -28,6 +28,11 @@ export default function AppError({
         <p className="max-w-md text-sm text-slate-600">
           Ocorreu um erro ao carregar esta página. Tente novamente ou volte ao dashboard.
         </p>
+        {process.env.NODE_ENV === 'development' && (
+          <p className="max-w-lg break-words rounded-md bg-white/80 px-3 py-2 font-mono text-xs text-red-800">
+            {error.message}
+          </p>
+        )}
         <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
           <Button onClick={reset} variant="default" size="sm">
             <RefreshCw className="mr-2 h-4 w-4" />

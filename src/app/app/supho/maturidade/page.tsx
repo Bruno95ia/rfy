@@ -21,7 +21,9 @@ export default async function MaturidadePage() {
 
   const { data: latestResult } = await supabase
     .from('supho_diagnostic_results')
-    .select('id, campaign_id, computed_at, ic, ih, ip, itsmo, nivel, gap_c_h, gap_c_p, ise, ipt, icl, sample_size')
+    .select(
+      'id, campaign_id, computed_at, ic, ih, ip, itsmo, nivel, gap_c_h, gap_c_p, ise, ipt, icl, sample_size, result_json'
+    )
     .eq('org_id', orgId)
     .order('computed_at', { ascending: false })
     .limit(1)
@@ -46,6 +48,47 @@ export default async function MaturidadePage() {
       }
     : null;
 
+  const rj = latestResult?.result_json as Record<string, unknown> | null | undefined;
+  const systemsRaw = rj?.systemsMaturity;
+  const systemsMaturity =
+    systemsRaw &&
+    typeof systemsRaw === 'object' &&
+    systemsRaw !== null &&
+    'ipPenaltyApplied' in systemsRaw &&
+    Array.isArray((systemsRaw as { reasons?: unknown }).reasons)
+      ? {
+          ipPenaltyApplied: Number((systemsRaw as { ipPenaltyApplied?: unknown }).ipPenaltyApplied ?? 0),
+          reasons: (systemsRaw as unknown as { reasons: string[] }).reasons,
+          hasActiveCrmIntegration: Boolean(
+            (systemsRaw as { hasActiveCrmIntegration?: unknown }).hasActiveCrmIntegration
+          ),
+          erpIntegrationStatus: String(
+            (systemsRaw as { erpIntegrationStatus?: unknown }).erpIntegrationStatus ?? 'unknown'
+          ),
+        }
+      : null;
+
+  const enrichment = result
+    ? {
+        systemsMaturity,
+        orgContextPresent: Boolean(rj?.orgContextPresent),
+        orgContextSummary:
+          typeof rj?.orgContextSummary === 'string' ? rj.orgContextSummary : null,
+        indicesFromSurvey:
+          rj?.indicesFromSurvey && typeof rj.indicesFromSurvey === 'object' && rj.indicesFromSurvey !== null
+            ? {
+                ic: Number((rj.indicesFromSurvey as { ic?: unknown }).ic),
+                ih: Number((rj.indicesFromSurvey as { ih?: unknown }).ih),
+                ip: Number((rj.indicesFromSurvey as { ip?: unknown }).ip),
+                itsmo: Number((rj.indicesFromSurvey as { itsmo?: unknown }).itsmo),
+                nivel: Number((rj.indicesFromSurvey as { nivel?: unknown }).nivel),
+                gapCH: Number((rj.indicesFromSurvey as { gapCH?: unknown }).gapCH),
+                gapCP: Number((rj.indicesFromSurvey as { gapCP?: unknown }).gapCP),
+              }
+            : null,
+      }
+    : null;
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -57,7 +100,7 @@ export default async function MaturidadePage() {
         title="Painel de Maturidade SUPHO"
         subtitle="Visão integrada do último diagnóstico: radar dos pilares, nível de maturidade (ITSMO), gaps e leitura executiva."
       />
-      <MaturidadePanelClient result={result} />
+      <MaturidadePanelClient result={result} enrichment={enrichment} />
       <HistoricoDiagnosticoClient />
     </div>
   );

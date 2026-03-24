@@ -23,10 +23,10 @@ export function PageHeader({
   className,
 }: PageHeaderProps) {
   return (
-    <header className={cn('space-y-5', className)}>
+    <header className={cn('min-w-0 space-y-5', className)}>
       {breadcrumbs.length > 0 && (
         <nav
-          className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-1.5 text-xs font-medium text-[var(--color-text-muted)] shadow-[var(--shadow-sm)]"
+          className="inline-flex max-w-full items-center gap-1.5 overflow-x-auto overflow-y-hidden rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-1.5 text-xs font-medium text-[var(--color-text-muted)] shadow-[var(--shadow-sm)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           aria-label="Breadcrumb"
         >
           {breadcrumbs.map((item, i) => (
@@ -48,9 +48,9 @@ export function PageHeader({
           ))}
         </nav>
       )}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-[clamp(1.5rem,4vw,1.875rem)] font-bold tracking-[-0.02em] text-[var(--color-text)]">
+      <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="break-words text-[clamp(1.5rem,4vw,1.875rem)] font-bold tracking-[-0.02em] text-[var(--color-text)]">
             {title}
           </h1>
           {subtitle && (

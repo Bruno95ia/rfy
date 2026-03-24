@@ -27,7 +27,10 @@ import {
   getExecutiveTextICL,
   getPerfilPredominante,
   getExecutiveTextPerfil,
+  getSystemsMaturityNarrative,
+  getOrgContextNarrative,
 } from '@/lib/supho/executive-text';
+import type { ErpIntegrationStatus, SystemsMaturityAssessment } from '@/lib/supho/systems-maturity';
 import { Gauge, FileText, ClipboardList, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -49,11 +52,46 @@ type Result = {
   sampleSize: number;
 };
 
+export type MaturidadeEnrichment = {
+  systemsMaturity: {
+    ipPenaltyApplied: number;
+    reasons: string[];
+    hasActiveCrmIntegration: boolean;
+    erpIntegrationStatus: string;
+  } | null;
+  orgContextPresent: boolean;
+  orgContextSummary: string | null;
+  indicesFromSurvey: {
+    ic: number;
+    ih: number;
+    ip: number;
+    itsmo: number;
+    nivel: number;
+    gapCH: number;
+    gapCP: number;
+  } | null;
+} | null;
+
 interface MaturidadePanelClientProps {
   result: Result | null;
+  enrichment?: MaturidadeEnrichment;
 }
 
-export function MaturidadePanelClient({ result }: MaturidadePanelClientProps) {
+function toSystemsAssessment(
+  s: NonNullable<NonNullable<MaturidadeEnrichment>['systemsMaturity']>
+): SystemsMaturityAssessment {
+  const erp = s.erpIntegrationStatus;
+  const erpIntegrationStatus: ErpIntegrationStatus =
+    erp === 'integrated' || erp === 'not_integrated' || erp === 'unknown' ? erp : 'unknown';
+  return {
+    ipPenalty: s.ipPenaltyApplied,
+    reasons: s.reasons,
+    hasActiveCrmIntegration: s.hasActiveCrmIntegration,
+    erpIntegrationStatus,
+  };
+}
+
+export function MaturidadePanelClient({ result, enrichment = null }: MaturidadePanelClientProps) {
   useEffect(() => {
     trackScreen('supho_maturidade');
   }, []);
@@ -163,6 +201,52 @@ export function MaturidadePanelClient({ result }: MaturidadePanelClientProps) {
           </CardContent>
         </Card>
       </div>
+
+      <Card className="border-[var(--color-border)] bg-[var(--color-surface)]">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base text-[var(--color-text)]">
+            <FileText className="h-4 w-4 text-[var(--color-primary)]" />
+            Diagnóstico contextual (sistemas e documentos)
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {enrichment?.systemsMaturity ? (
+            <div>
+              <p className="text-xs font-semibold uppercase text-[var(--color-text-muted)]">
+                Maturidade de sistemas (CRM / ERP)
+              </p>
+              <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-[var(--color-text)]">
+                {getSystemsMaturityNarrative(toSystemsAssessment(enrichment.systemsMaturity))}
+              </p>
+              {enrichment.systemsMaturity.ipPenaltyApplied > 0 && enrichment.indicesFromSurvey && (
+                <p className="mt-2 text-xs text-[var(--color-text-muted)]">
+                  Índices apenas do questionário (antes do ajuste de sistemas): ITSMO{' '}
+                  {enrichment.indicesFromSurvey.itsmo.toFixed(1)} · IP {enrichment.indicesFromSurvey.ip.toFixed(1)}.
+                </p>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-[var(--color-text-muted)]">
+              Este resultado foi calculado antes da camada de CRM/ERP ou o registro não inclui metadados. Recalcule o
+              diagnóstico na campanha SUPHO para incorporar integrações e o ajuste de IP.
+            </p>
+          )}
+          <div>
+            <p className="text-xs font-semibold uppercase text-[var(--color-text-muted)]">
+              Documentos de contexto da organização
+            </p>
+            <p className="mt-2 max-h-[320px] overflow-y-auto whitespace-pre-wrap text-sm leading-relaxed text-[var(--color-text)]">
+              {getOrgContextNarrative(enrichment?.orgContextSummary ?? null)}
+            </p>
+            <Link
+              href="/app/settings/contexto-organizacao"
+              className="mt-2 inline-block text-sm text-[var(--color-primary)] hover:underline"
+            >
+              Editar contexto em Configurações
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Indicadores e textos executivos */}
       <Card className="border-[var(--color-border)] bg-[var(--color-surface)]">

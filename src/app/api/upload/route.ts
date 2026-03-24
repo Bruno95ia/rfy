@@ -5,8 +5,8 @@ import { checkRateLimit } from '@/lib/ratelimit';
 import { checkOrgLimit, recordUsageEvent, appendAuditLog } from '@/lib/billing';
 import { inngest } from '@/inngest/client';
 import {
-  processOpportunitiesCsv,
-  processActivitiesCsv,
+  processOpportunitiesFromBuffer,
+  processActivitiesFromBuffer,
   linkActivitiesToOpportunities,
 } from '@/lib/upload-process';
 import { computeAndPersistReport } from '@/lib/report-compute-persist';
@@ -60,10 +60,29 @@ export async function POST(request: Request) {
     );
   }
 
-  const allowedTypes = ['text/csv', 'application/csv', 'text/plain'];
-  if (file.type && !allowedTypes.includes(file.type)) {
+  const lowerName = file.name.toLowerCase();
+  const allowedExt =
+    lowerName.endsWith('.csv') ||
+    lowerName.endsWith('.tsv') ||
+    lowerName.endsWith('.txt') ||
+    lowerName.endsWith('.xlsx') ||
+    lowerName.endsWith('.xls');
+  const allowedTypes = [
+    'text/csv',
+    'application/csv',
+    'text/plain',
+    'text/tab-separated-values',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/octet-stream',
+    '',
+  ];
+  if (!allowedExt || (file.type && !allowedTypes.includes(file.type))) {
     return NextResponse.json(
-      { error: 'Tipo de arquivo inválido. Apenas CSV é aceito.' },
+      {
+        error:
+          'Formato não suportado. Use CSV, TSV, TXT ou Excel (.xlsx / .xls) exportados do seu CRM.',
+      },
       { status: 400 }
     );
   }
@@ -93,7 +112,13 @@ export async function POST(request: Request) {
   const { error: storageError } = await admin.storage
     .from('uploads')
     .upload(filename, buffer, {
-      contentType: file.type || 'text/csv',
+      contentType:
+        file.type ||
+        (lowerName.endsWith('.xlsx')
+          ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+          : lowerName.endsWith('.xls')
+            ? 'application/vnd.ms-excel'
+            : 'text/csv'),
       upsert: true,
     });
 
@@ -139,14 +164,13 @@ export async function POST(request: Request) {
     });
   } catch (inngestErr) {
     console.warn('Inngest indisponível, processando upload em modo síncrono:', inngestErr);
-    const csvBody = buffer.toString('utf-8');
     try {
       await admin.from('uploads').update({ status: 'processing' }).eq('id', upload!.id);
       if (kindVal === 'opportunities') {
-        await processOpportunitiesCsv(admin, orgIdVal, upload!.id, csvBody);
+        await processOpportunitiesFromBuffer(admin, orgIdVal, upload!.id, buffer, file.name);
         await computeAndPersistReport(admin, orgIdVal, upload!.id);
       } else {
-        await processActivitiesCsv(admin, orgIdVal, upload!.id, csvBody);
+        await processActivitiesFromBuffer(admin, orgIdVal, upload!.id, buffer, file.name);
         await linkActivitiesToOpportunities(admin, orgIdVal, upload!.id);
         await computeAndPersistReport(admin, orgIdVal, null);
       }
@@ -161,7 +185,7 @@ export async function POST(request: Request) {
         })
         .eq('id', upload!.id);
       return NextResponse.json(
-        { error: 'Erro ao processar o CSV: ' + msg },
+        { error: 'Erro ao processar o arquivo: ' + msg },
         { status: 500 }
       );
     }

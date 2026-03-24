@@ -6,7 +6,7 @@
     "dev": "next dev -p 3000",
     "dev:local": "next dev -p 3001",
     "build": "next build",
-    "postbuild": "bash -c '([ -d .next/static ] && [ -d .next/standalone/.next ]) && cp -r .next/static .next/standalone/.next/; ([ -d public ]) && cp -r public .next/standalone/ 2>/dev/null; true'",
+    "postbuild": "bash -c '([ -d .next/static ] && [ -d .next/standalone/.next ]) && cp -r .next/static .next/standalone/.next/; ([ -d public ]) && cp -r public .next/standalone/ 2>/dev/null; true' && node -e \"require('fs').accessSync('.next/server/app/app/settings/conhecimento/page.js'); console.log('postbuild: rota conhecimento OK');\"",
     "start": "next start",
     "start:standalone": "bash scripts/start-standalone.sh",
     "lint": "eslint src",

@@ -7,7 +7,17 @@ import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ClipboardList, Plus, Users, Calculator, ArrowRight, Loader2, Send, Save } from 'lucide-react';
+import {
+  ClipboardList,
+  Plus,
+  Users,
+  Calculator,
+  ArrowRight,
+  Loader2,
+  Send,
+  Save,
+  Package,
+} from 'lucide-react';
 import { fetchJsonWithRetry } from '@/lib/supho/fetch-with-retry';
 
 type Campaign = { id: string; name: string; status: string; created_at: string; question_ids?: string[] | null };
@@ -322,6 +332,28 @@ export function DiagnosticoClient({ orgId, initialCampaigns }: DiagnosticoClient
           </Button>
         </div>
       )}
+
+      <Card className="border-indigo-100 bg-indigo-50/40">
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-base text-slate-900">
+            <Package className="h-4 w-4 text-indigo-600" />
+            Context Pack — diagnóstico Core (ITSMO)
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm text-slate-700">
+          <p>
+            <strong>15 perguntas Core</strong> nos blocos A/B/C (seed global). Use campanhas com o pacote completo para
+            comparar evolução em <strong>90/90</strong>. Qualidade de leitura (confidence):{' '}
+            <strong>Alto</strong> — ≥70% de respostas e ≥80% de cobertura por bloco; <strong>Médio</strong> — 50–70% ou
+            cobertura parcial; <strong>Baixo</strong> — &lt;50% ou blocos incompletos. Planeje{' '}
+            <strong>reavaliação ~90 dias</strong> após cada campanha.
+          </p>
+          <Link href="/app/settings/context-pack" className="inline-flex items-center gap-1 font-medium text-indigo-600 hover:underline">
+            Abrir Context Pack completo (ICP, pricing, roadmap)
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>

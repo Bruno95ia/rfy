@@ -37,8 +37,8 @@ export async function DELETE(
     return NextResponse.json({ error: 'Sem permissão' }, { status: 403 });
   }
   const role = await getOrgMemberRole(user.id, invite.org_id);
-  if (!role || (role !== 'owner' && role !== 'admin')) {
-    return NextResponse.json({ error: 'Apenas owner ou admin podem revogar convites' }, { status: 403 });
+  if (!role || !['owner', 'admin', 'manager'].includes(role)) {
+    return NextResponse.json({ error: 'Sem permissão para revogar convites' }, { status: 403 });
   }
 
   const now = new Date().toISOString();

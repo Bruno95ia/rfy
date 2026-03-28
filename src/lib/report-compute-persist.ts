@@ -13,6 +13,7 @@ import {
 } from '@/lib/metrics/compute';
 import { computeUnitEconomics } from '@/lib/metrics/unit-economics';
 import { touchMetricsStatus } from '@/lib/metrics/status';
+import { METRICS_DEFINITION_VERSION } from '@/lib/metrics/definitions';
 
 export async function computeAndPersistReport(
   admin: AdminDbClientType,
@@ -128,6 +129,7 @@ export async function computeAndPersistReport(
     frictions_json: frictions as unknown as Record<string, unknown>[],
     pillar_scores_json: pillar_scores as unknown as Record<string, unknown>,
     impact_json: impact_json as unknown as Record<string, unknown>,
+    metrics_definition_version: METRICS_DEFINITION_VERSION,
   });
 
   await touchMetricsStatus(admin, orgId);

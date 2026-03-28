@@ -386,7 +386,7 @@ DELETE FROM reports
 WHERE org_id = __ORG_ID__::uuid
   AND impact_json->>'seed_tag' = 'demo_v1';
 
-INSERT INTO reports(org_id, upload_id, generated_at, snapshot_json, frictions_json, pillar_scores_json, impact_json)
+INSERT INTO reports(org_id, upload_id, generated_at, snapshot_json, frictions_json, pillar_scores_json, impact_json, metrics_definition_version)
 VALUES (
   __ORG_ID__::uuid,
   'a7f6c321-6f8b-43ba-9519-111111111111'::uuid,
@@ -435,7 +435,8 @@ VALUES (
     'cycle_reduction_pct', 11.4,
     'revenue_anticipated', 614000,
     'seed_tag', 'demo_v1'
-  )
+  ),
+  '1.0.0'
 );
 
 INSERT INTO org_audit_logs(org_id, actor_user_id, action, entity_type, metadata_json)

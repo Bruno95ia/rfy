@@ -16,6 +16,17 @@ Essas definições são consistentes com:
 - `docs/O_QUE_O_SAAS_OFERECE.md` — seções de Visão geral, Dashboard e Receita Declarada vs Receita Confiável.
 - `docs/REESTRUTURACAO_ESTRATEGICA_RFY_INDEX.md` — seções 1.2, 3.1 e 5 (modelo do RFY Index).
 
+#### 1.1 Versão das definições (semver)
+
+Cada relatório persistido em `reports` inclui **`metrics_definition_version`**: o número semântico das regras usadas ao calcular `snapshot_json`, `frictions_json` e `pillar_scores_json` (não confundir com o contador interno de `GET /api/metrics/status` usado para invalidar cache).
+
+- **Fonte no código**: constante `METRICS_DEFINITION_VERSION` em [`src/lib/metrics/definitions.ts`](../src/lib/metrics/definitions.ts) — deve coincidir com o valor gravado em novos relatórios e com o default da migration `020_reports_metrics_definition_version.sql`.
+- **Quando incrementar**
+  - **Patch** (ex. 1.0.0 → 1.0.1): correções que não alteram a semântica percebida pelo cliente (bugs, copy técnico).
+  - **Minor** (ex. 1.0.x → 1.1.0): novo campo no snapshot, novo tipo de fricção, alteração de thresholds default que muda resultados de forma compatível com o passado.
+  - **Major** (ex. 1.x → 2.0.0): mudança na definição de RFY Index, Receita Confiável/Inflada ou regras de fricção que exige comunicação ao cliente e possível reprocessamento histórico.
+- **Superfície no produto**: o dashboard mostra um badge **“Definições RFY v…”** quando há relatório; `GET /api/metrics/summary` devolve `metrics_definition_version` (ou `null` se ainda não existe relatório).
+
 ---
 
 ### 2. Fórmulas implementadas hoje (API de resumo)

@@ -216,6 +216,73 @@ function createAdminStub(state: {
         };
       }
 
+      if (table === 'crm_integrations') {
+        return {
+          select() {
+            return {
+              eq() {
+                return {
+                  eq() {
+                    return {
+                      limit() {
+                        return Promise.resolve({ data: [], error: null });
+                      },
+                    };
+                  },
+                };
+              },
+            };
+          },
+        };
+      }
+
+      if (table === 'org_config') {
+        return {
+          select() {
+            return {
+              eq() {
+                return {
+                  async maybeSingle() {
+                    return { data: { erp_integration_status: 'unknown' }, error: null };
+                  },
+                };
+              },
+            };
+          },
+        };
+      }
+
+      if (table === 'org_context_documents') {
+        return {
+          select() {
+            return {
+              eq() {
+                return Promise.resolve({ data: [], error: null });
+              },
+            };
+          },
+        };
+      }
+
+      if (table === 'org_knowledge_files') {
+        return {
+          select() {
+            return {
+              eq() {
+                return {
+                  is() {
+                    return Promise.resolve({ data: [], error: null });
+                  },
+                  eq() {
+                    return Promise.resolve({ data: [], error: null });
+                  },
+                };
+              },
+            };
+          },
+        };
+      }
+
       throw new Error(`Unexpected table ${table}`);
     },
   };

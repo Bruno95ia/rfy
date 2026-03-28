@@ -28,7 +28,7 @@ export function cleanPiperunLine(line: string): string {
  */
 export function parseMoneyFlexible(value: string | null): number | null {
   if (value == null || value.trim() === '') return null;
-  let s = value
+  const s = value
     .trim()
     .replace(/^\s*R\$\s*/i, '')
     .replace(/^\s*[$€£]\s*/, '')
@@ -100,7 +100,9 @@ export function parseDateFlexible(value: string | null): string | null {
 }
 
 /**
- * Parse de datetime BR: "08/01/2021 14:00:00" -> ISO com timezone UTC
+ * Parse de datetime BR ou ISO parcial: ex. "08/01/2021 14:00:00" ou "2021-01-08 14:00" -> ISO em UTC com sufixo Z.
+ * Quando não há componente de hora (apenas data, via `parseDateFlexible`), o resultado usa meio-dia UTC (`T12:00:00Z`),
+ * alinhado ao restante do parsing flexível de datas na importação.
  */
 export function parseBRDateTime(value: string | null): string | null {
   if (value == null || value.trim() === '') return null;

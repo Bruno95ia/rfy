@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: 'standalone',
+  serverExternalPackages: ['pdf-parse', 'mammoth', 'xlsx'],
   async rewrites() {
     return [
       { source: '/apple-touch-icon.png', destination: '/logo/revenue-engine-symbol-favicon.svg' },

@@ -72,9 +72,12 @@ export function SuphoExternalImportForm({ orgId }: Props) {
       if (!res.ok) {
         throw new Error(typeof data.error === 'string' ? data.error : 'Erro na importação');
       }
+      const saved = (data as { import_file_saved?: boolean }).import_file_saved === true;
       toast({
         title: 'Importação concluída',
-        description: `${data.respondents ?? 0} respondente(s), ${data.answer_rows ?? 0} resposta(s).`,
+        description: `${data.respondents ?? 0} respondente(s), ${data.answer_rows ?? 0} resposta(s).${
+          saved ? ' Cópia do arquivo guardada no repositório Conhecimento (auditoria).' : ''
+        }`,
         variant: 'success',
       });
       (e.currentTarget.elements.namedItem('file') as HTMLInputElement).value = '';
@@ -128,7 +131,7 @@ export function SuphoExternalImportForm({ orgId }: Props) {
       <div className="grid gap-3 text-xs text-slate-500 sm:grid-cols-3">
         <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
           <FileSpreadsheet className="h-4 w-4 text-indigo-500" />
-          Planilha (CSV, TSV, Excel…): respondent, question_id, value
+          Planilha (CSV, TSV, Excel…): respondent, question_id ou id_question, value
         </div>
         <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
           <FileJson className="h-4 w-4 text-indigo-500" />
@@ -159,8 +162,8 @@ export function SuphoExternalImportForm({ orgId }: Props) {
           className="block w-full text-sm text-slate-600 file:mr-4 file:rounded-lg file:border-0 file:bg-indigo-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-indigo-700 hover:file:bg-indigo-100 disabled:opacity-50"
         />
         <p className="mt-3 text-xs text-slate-500">
-          Qualquer arquivo de texto ou Excel com colunas reconhecíveis (aliases em PT/EN). JSON no formato da
-          API. Perguntas:{' '}
+          Se você abriu o modelo CSV no Excel e tudo ficou na coluna A, pode enviar assim mesmo — o import
+          reconhece. Preferível: colunas separadas (respondent, question_id, value) ou JSON da API. Perguntas:{' '}
           <a href="/api/supho/questions" className="text-indigo-600 hover:underline" target="_blank" rel="noreferrer">
             /api/supho/questions
           </a>

@@ -7,12 +7,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requireAuthAndOrgAccess } from '@/lib/auth';
 import { computeRfySummary } from '@/lib/metrics/rfy-summary';
+import { METRICS_DEFINITION_VERSION } from '@/lib/metrics/definitions';
 
 const AI_BASE = process.env.AI_SERVICE_URL ?? 'http://localhost:8001';
 const AI_FETCH_TIMEOUT_MS = 25000;
 
 export type MetricsSummaryResponse = {
   generated_at: string | null;
+  /** Semver das regras de métricas do último relatório; null se ainda não há relatório */
+  metrics_definition_version: string | null;
   rfy_index_pct: number | null;
   receita_confiavel_30d: number;
   receita_inflada: number;
@@ -29,7 +32,7 @@ export async function GET(req: NextRequest) {
   const admin = createAdminClient();
   const { data: report } = await admin
     .from('reports')
-    .select('generated_at, snapshot_json')
+    .select('generated_at, snapshot_json, metrics_definition_version')
     .eq('org_id', auth.orgId)
     .order('generated_at', { ascending: false })
     .limit(1)
@@ -75,8 +78,17 @@ export async function GET(req: NextRequest) {
     pipelineBruto,
   });
 
+  const rawVersion = report?.metrics_definition_version;
+  const metricsDefinitionVersionResolved =
+    report == null
+      ? null
+      : typeof rawVersion === 'string' && rawVersion.length > 0
+        ? rawVersion
+        : METRICS_DEFINITION_VERSION;
+
   const body: MetricsSummaryResponse = {
     generated_at: report?.generated_at ?? null,
+    metrics_definition_version: metricsDefinitionVersionResolved,
     rfy_index_pct: summary.rfyIndexPct,
     receita_confiavel_30d: summary.receitaConfiavel30d,
     receita_inflada: summary.receitaInflada,

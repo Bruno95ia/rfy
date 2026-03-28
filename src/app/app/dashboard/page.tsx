@@ -1,7 +1,9 @@
 import { requireAuth, getOrgIdForUser, getOrgMemberRole } from '@/lib/auth';
+import { getProcessedUploads30d } from '@/lib/org/usage';
 import { createClient } from '@/lib/supabase/server';
-import { DashboardClient, type DashboardClientProps } from './DashboardClient';
+import { DashboardClient } from './DashboardClient';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { GettingStartedCard } from '@/components/layout/GettingStartedCard';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 
@@ -23,11 +25,14 @@ export default async function DashboardPage() {
 
   const { data: report } = await supabase
     .from('reports')
-    .select('id, snapshot_json, frictions_json, pillar_scores_json, generated_at')
+    .select('id, snapshot_json, frictions_json, pillar_scores_json, generated_at, metrics_definition_version')
     .eq('org_id', orgId)
     .order('generated_at', { ascending: false })
     .limit(1)
-    .single();
+    .maybeSingle();
+
+  const processedUploads30d = await getProcessedUploads30d(orgId);
+  const showGettingStarted = !report && processedUploads30d === 0;
 
   const { data: latestSupho } = await supabase
     .from('supho_diagnostic_results')
@@ -101,56 +106,50 @@ export default async function DashboardPage() {
         actions={
           report ? (
             <div className="flex flex-wrap items-center gap-2">
-              <a
-                href={`/api/reports/executivo?org_id=${encodeURIComponent(orgId)}&format=pdf`}
-                download="relatorio-executivo.html"
-              >
-                <Button size="sm">
+              <Button asChild size="sm">
+                <a
+                  href={`/api/reports/executivo?org_id=${encodeURIComponent(orgId)}&format=pdf`}
+                  download="relatorio-executivo.html"
+                >
                   PDF
-                </Button>
-              </a>
-              <a
-                href={`/api/reports/executive.csv?org_id=${encodeURIComponent(orgId)}`}
-                download="relatorio-executivo.csv"
-              >
-                <Button variant="outline" size="sm">
+                </a>
+              </Button>
+              <Button asChild variant="outline" size="sm">
+                <a
+                  href={`/api/reports/executive.csv?org_id=${encodeURIComponent(orgId)}`}
+                  download="relatorio-executivo.csv"
+                >
                   CSV
-                </Button>
-              </a>
-              <a
-                href={`/api/reports/executive.xlsx?org_id=${encodeURIComponent(orgId)}`}
-                download="relatorio-executivo.xlsx"
-              >
-                <Button variant="outline" size="sm">
+                </a>
+              </Button>
+              <Button asChild variant="outline" size="sm">
+                <a
+                  href={`/api/reports/executive.xlsx?org_id=${encodeURIComponent(orgId)}`}
+                  download="relatorio-executivo.xlsx"
+                >
                   Excel
-                </Button>
-              </a>
-              <Link href="/app/reports">
-                <Button variant="outline" size="sm">
-                  Abrir central de relatórios
-                </Button>
-              </Link>
+                </a>
+              </Button>
+              <Button asChild variant="outline" size="sm">
+                <Link href="/app/reports">Abrir central de relatórios</Link>
+              </Button>
             </div>
           ) : (
             <div className="flex items-center gap-2">
-              <Link href="/app/uploads">
-                <Button size="sm">
-                  Fazer primeiro upload
-                </Button>
-              </Link>
-              <Link href="/app/settings">
-                <Button variant="outline" size="sm">
-                  Configurar integração
-                </Button>
-              </Link>
+              <Button asChild size="sm">
+                <Link href="/app/uploads">Fazer primeiro upload</Link>
+              </Button>
+              <Button asChild variant="outline" size="sm">
+                <Link href="/app/settings">Configurar integração</Link>
+              </Button>
             </div>
           )
         }
       />
+      {showGettingStarted && <GettingStartedCard />}
       <DashboardClient
         orgId={orgId}
         userRole={role ?? 'viewer'}
-        report={report as DashboardClientProps['report']}
         snapshot={report?.snapshot_json as Record<string, unknown> | null}
         frictions={report?.frictions_json as Array<Record<string, unknown>> | null}
         pillarScores={report?.pillar_scores_json as Record<string, unknown> | null}
@@ -158,6 +157,11 @@ export default async function DashboardPage() {
         suphoResult={suphoResult}
         unitEconomics={unitEconomics}
         icpCached={icpCached}
+        initialMetricsDefinitionVersion={
+          typeof report?.metrics_definition_version === 'string'
+            ? report.metrics_definition_version
+            : null
+        }
       />
     </div>
   );

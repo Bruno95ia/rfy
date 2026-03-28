@@ -3,9 +3,11 @@
  * Usa NEXT_PUBLIC_AI_SERVICE_URL ou AI_SERVICE_URL (server-side).
  */
 
+import { getEffectiveAiServiceUrl } from '@/lib/ai-deployment';
+
 const getBaseUrl = (): string => {
   if (typeof window !== 'undefined') return '';
-  return process.env.AI_SERVICE_URL ?? 'http://localhost:8001';
+  return getEffectiveAiServiceUrl();
 };
 
 export type PredictDealResponse = {

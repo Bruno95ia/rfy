@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -23,6 +23,8 @@ import {
   Users,
   Package,
   Library,
+  Bot,
+  Building2,
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
@@ -34,6 +36,8 @@ interface NavItem {
   href: string;
   label: string;
   icon: LucideIcon;
+  /** Mostrar um rótulo de grupo acima deste item (secção Data). */
+  groupBefore?: string;
 }
 
 interface NavCategory {
@@ -54,7 +58,7 @@ const navItems: NavCategory[] = [
       { href: '/app/reports', label: 'Relatórios', icon: BarChart3 },
       { href: '/app/forecast', label: 'Previsão', icon: TrendingUp },
       { href: '/app/ai', label: 'Inteligência IA', icon: Sparkles },
-      { href: '/app/copilot-contas', label: 'Copiloto de contas', icon: Sparkles },
+      { href: '/app/copilot-contas', label: 'Copiloto de contas', icon: Bot },
     ],
   },
   {
@@ -73,7 +77,17 @@ const navItems: NavCategory[] = [
       { href: '/app/uploads', label: 'Uploads', icon: Upload },
       { href: '/app/pessoas', label: 'Pessoas', icon: Users },
       { href: '/app/integracoes', label: 'Integrações', icon: Plug },
-      { href: '/app/settings', label: 'Configurações', icon: Settings },
+      {
+        href: '/app/settings',
+        label: 'Configurações',
+        icon: Settings,
+        groupBefore: 'Organização',
+      },
+      {
+        href: '/app/settings/contexto-organizacao',
+        label: 'Contexto da organização',
+        icon: Building2,
+      },
       { href: '/app/settings/context-pack', label: 'Context Pack', icon: Package },
       { href: '/app/settings/conhecimento', label: 'Conhecimento', icon: Library },
     ],
@@ -131,11 +145,11 @@ export function AppShell({
       {/* Sidebar */}
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-50 w-[260px] transform border-r border-[var(--color-border)] bg-[var(--color-surface)] shadow-[2px_0_24px_-4px_rgba(15,23,42,0.06)] transition-all duration-300 ease-out dark:shadow-[2px_0_24px_-4px_rgba(0,0,0,0.25)] lg:relative lg:translate-x-0',
+          'fixed inset-y-0 left-0 z-50 flex h-full min-h-0 w-[260px] shrink-0 flex-col transform border-r border-[var(--color-border)] bg-[var(--color-surface)] shadow-[2px_0_24px_-4px_rgba(15,23,42,0.06)] transition-all duration-300 ease-out dark:shadow-[2px_0_24px_-4px_rgba(0,0,0,0.25)] lg:relative lg:h-auto lg:min-h-screen lg:translate-x-0',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >
-        <div className="flex h-16 items-center justify-between border-b border-[var(--color-border)] px-4">
+        <div className="flex h-16 shrink-0 items-center justify-between border-b border-[var(--color-border)] px-4">
           <Link
             href="/app/dashboard"
             className="flex items-center gap-3 transition-opacity hover:opacity-90"
@@ -158,7 +172,10 @@ export function AppShell({
           </button>
         </div>
 
-        <nav className="flex flex-1 flex-col overflow-y-auto p-3" aria-label="Navegação principal">
+        <nav
+          className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden p-3"
+          aria-label="Navegação principal"
+        >
           {navItems.map(({ category, items }) => (
             <div key={category} className="mb-4">
               <p className="mb-0.5 px-2.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
@@ -169,37 +186,49 @@ export function AppShell({
                   Maturidade organizacional
                 </p>
               )}
+              {category === 'Data' && (
+                <p className="mb-1.5 px-2.5 text-[10px] text-[var(--color-text-muted)]">
+                  Dados e definições da organização
+                </p>
+              )}
               <div className="space-y-0.5">
-                {items.map(({ href, label, icon: Icon }) => {
-                  const isActive = activeNavItem?.href === href;
-                  return (
-                    <Link
-                      key={href}
-                      href={href}
-                      onClick={() => setSidebarOpen(false)}
-                      className={cn(
-                        'flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200',
-                        isActive
-                          ? 'bg-[var(--color-primary-soft)] text-[var(--color-primary)] shadow-[var(--shadow-sm)]'
-                          : 'text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)]'
-                      )}
-                    >
-                      <Icon
-                        className={cn(
-                          'h-[18px] w-[18px] shrink-0',
-                          isActive && 'text-[var(--color-primary)]'
+                {items.map(({ href, label, icon: Icon, groupBefore }) => {
+                    const isActive = activeNavItem?.href === href;
+                    return (
+                      <Fragment key={href}>
+                        {groupBefore && (
+                          <p className="mb-0.5 mt-2.5 px-2.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
+                            {groupBefore}
+                          </p>
                         )}
-                      />
-                      {label}
-                    </Link>
-                  );
-                })}
+                        <Link
+                          href={href}
+                          onClick={() => setSidebarOpen(false)}
+                          className={cn(
+                            'flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200',
+                            isActive
+                              ? 'bg-[var(--color-primary-soft)] text-[var(--color-primary)] shadow-[var(--shadow-sm)]'
+                              : 'text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)]'
+                          )}
+                        >
+                          <Icon
+                            className={cn(
+                              'h-[18px] w-[18px] shrink-0',
+                              isActive && 'text-[var(--color-primary)]'
+                            )}
+                          />
+                          {label}
+                        </Link>
+                      </Fragment>
+                    );
+                  }
+                )}
               </div>
             </div>
           ))}
         </nav>
 
-        <div className="border-t border-[var(--color-border)] p-3">
+        <div className="shrink-0 border-t border-[var(--color-border)] p-3">
           <div className="rounded-xl bg-[var(--color-surface-muted)] px-3 py-2.5">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
               Organização
@@ -213,7 +242,7 @@ export function AppShell({
 
       {/* Main */}
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2 border-b border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-surface)_92%,transparent)] px-4 shadow-[var(--shadow-sm)] backdrop-blur-[12px] sm:gap-3 lg:px-6 dark:bg-[color-mix(in_srgb,var(--color-surface)_90%,transparent)]">
+        <header className="sticky top-0 z-30 flex min-h-14 shrink-0 flex-wrap items-center gap-x-2 gap-y-2 border-b border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-surface)_92%,transparent)] px-4 py-2 shadow-[var(--shadow-sm)] backdrop-blur-[12px] sm:h-14 sm:flex-nowrap sm:gap-3 sm:py-0 lg:px-6 dark:bg-[color-mix(in_srgb,var(--color-surface)_90%,transparent)]">
           <button
             type="button"
             onClick={() => setSidebarOpen(true)}
@@ -236,7 +265,7 @@ export function AppShell({
             <p className="mt-0.5 truncate text-xs text-[var(--color-text-muted)]">{orgName}</p>
           </div>
 
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex min-w-0 shrink-0 flex-wrap items-center justify-end gap-x-2 gap-y-2 sm:flex-nowrap">
               {!aiActive && (
                 <span className="hidden items-center gap-1.5 rounded-full border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-2.5 py-1 text-xs font-medium text-[var(--color-text-muted)] sm:inline-flex">
                   <Sparkles className="h-3.5 w-3.5 opacity-70" />
@@ -253,16 +282,17 @@ export function AppShell({
                 </span>
               )}
 
-              <Link href="/app/uploads">
-                <Button
-                  variant={isUploadsPage ? 'outline' : 'default'}
-                  size="sm"
-                  className="shrink-0 font-semibold shadow-[var(--shadow-sm)]"
-                >
+              <Button
+                asChild
+                variant={isUploadsPage ? 'outline' : 'default'}
+                size="sm"
+                className="shrink-0 font-semibold shadow-[var(--shadow-sm)]"
+              >
+                <Link href="/app/uploads">
                   <Upload className="h-4 w-4" />
                   Upload CSV
-                </Button>
-              </Link>
+                </Link>
+              </Button>
 
               <ThemeToggle />
 

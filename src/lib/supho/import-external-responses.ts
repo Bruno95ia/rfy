@@ -5,7 +5,12 @@
  */
 import { z } from 'zod';
 import type { AdminDbClientType } from '@/lib/supabase/admin';
-import { parseFlexibleDelimited, parseExcelToMatrix } from '@/lib/piperun/flexible-import';
+import {
+  decodeBufferToUtf8String,
+  parseFlexibleDelimited,
+  parseExcelToMatrix,
+  unfoldSingleColumnMatrix,
+} from '@/lib/piperun/flexible-import';
 
 export type SuphoImportAnswer = { question_id: string; value: number };
 
@@ -42,9 +47,29 @@ function getCell(row: Record<string, unknown>, aliases: string[]): string {
   return '';
 }
 
-const RESPONDENT_ALIASES = ['respondent', 'respondente', 'role', 'papel', 'nome', 'name', 'respondente_nome'];
-const QUESTION_ALIASES = ['question_id', 'pergunta_id', 'question', 'pergunta', 'id_pergunta', 'qid'];
-const VALUE_ALIASES = ['value', 'valor', 'nota', 'score', 'pontuacao', 'pontuacao_likert'];
+const RESPONDENT_ALIASES = [
+  'respondent',
+  'respondente',
+  'role',
+  'papel',
+  'nome',
+  'name',
+  'respondente_nome',
+  'email',
+  'participant',
+  'participante',
+];
+const QUESTION_ALIASES = [
+  'question_id',
+  'id_question',
+  'pergunta_id',
+  'question',
+  'pergunta',
+  'id_pergunta',
+  'id_da_pergunta',
+  'qid',
+];
+const VALUE_ALIASES = ['value', 'valor', 'nota', 'score', 'pontuacao', 'pontuacao_likert', 'answer', 'resposta'];
 const TIME_AREA_ALIASES = ['time_area', 'time', 'area', 'area_tempo'];
 const UNIT_ALIASES = ['unit', 'unidade'];
 const EXTERNAL_ALIASES = ['external_id', 'id_externo', 'grupo', 'group_id', 'respondent_key', 'chave'];
@@ -69,8 +94,9 @@ function stripCommentRowsFromMatrix(rows: string[][]): string[][] {
 /** Cabeçalho na primeira linha; colunas com aliases (respondent, question_id, value, …). */
 export function parseSuphoImportMatrix(rows: string[][]): { groups: SuphoImportGroup[]; errors: string[] } {
   const errors: string[] = [];
+  const expanded = unfoldSingleColumnMatrix(rows);
   const data = stripCommentRowsFromMatrix(
-    rows.filter((r) => r.some((c) => String(c).trim() !== ''))
+    expanded.filter((r) => r.some((c) => String(c).trim() !== ''))
   );
   if (data.length < 2) {
     return { groups: [], errors: ['Arquivo precisa de cabeçalho e pelo menos uma linha de dados'] };
@@ -107,7 +133,9 @@ export function parseSuphoImportMatrix(rows: string[][]): { groups: SuphoImportG
       return;
     }
     if (!questionId) {
-      errors.push(`Linha ${line}: question_id vazio`);
+      errors.push(
+        `Linha ${line}: identificador da pergunta vazio (use coluna question_id, id_question, id_pergunta ou equivalente)`
+      );
       return;
     }
     const value = Number(valueRaw.replace(',', '.'));
@@ -230,7 +258,7 @@ export function parseSuphoImportFromBuffer(
     return { ok: true, kind: 'tabular', groups: parsed.groups };
   }
 
-  const text = stripBom(buffer.toString('utf-8'));
+  const text = stripBom(decodeBufferToUtf8String(buffer));
   const trimmed = text.trim();
   if (trimmed.startsWith('{') && trimmed.includes('"campaign_id"')) {
     try {

@@ -37,7 +37,8 @@ export default defineConfig({
   webServer: {
     command: 'npm run dev',
     url: 'http://127.0.0.1:3000',
-    reuseExistingServer: true,
+    /** Em CI inicia sempre o servidor; localmente reutiliza se já estiver na porta. */
+    reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },
 });

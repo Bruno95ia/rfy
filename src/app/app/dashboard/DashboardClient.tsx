@@ -87,7 +87,6 @@ export type DashboardUserRole = 'owner' | 'admin' | 'manager' | 'viewer';
 export interface DashboardClientProps {
   orgId: string;
   userRole?: DashboardUserRole;
-  report: { id: string } | null;
   snapshot: Record<string, unknown> | null;
   frictions: Array<Record<string, unknown>> | null;
   pillarScores: Record<string, unknown> | null;
@@ -99,6 +98,8 @@ export interface DashboardClientProps {
     icp_study_json: Record<string, unknown>;
     generated_at: string;
   } | null;
+  /** Semver das definições do último relatório (SSR); o poll de /api/metrics/summary atualiza */
+  initialMetricsDefinitionVersion?: string | null;
 }
 
 type OpenAlertRow = {
@@ -149,11 +150,14 @@ export function DashboardClient({
   suphoResult = null,
   unitEconomics = null,
   icpCached = null,
+  initialMetricsDefinitionVersion = null,
 }: DashboardClientProps) {
   const isExecutive = userRole === 'owner' || userRole === 'admin';
   const advancedNavLinks = isExecutive ? ADVANCED_NAV_EXECUTIVE : ADVANCED_NAV_DEFAULT;
   const [reportGeneratedAt, setReportGeneratedAt] = useState<string | null>(generatedAt);
-  const [metricsVersion, setMetricsVersion] = useState<number | null>(null);
+  const [metricsDefinitionVersion, setMetricsDefinitionVersion] = useState<string | null>(
+    initialMetricsDefinitionVersion
+  );
   const [openAlerts, setOpenAlerts] = useState<OpenAlertRow[]>([]);
   const [aiForecast, setAiForecast] = useState<number | null>(null);
   const [aiPipelineBruto, setAiPipelineBruto] = useState<number | null>(null);
@@ -199,6 +203,7 @@ export function DashboardClient({
       if (!res.ok) return;
       const payload = (await res.json()) as {
         generated_at?: string | null;
+        metrics_definition_version?: string | null;
         receita_confiavel_30d?: number;
         pipeline_declarado?: number;
         rfy_source?: 'ai' | 'fallback';
@@ -214,6 +219,10 @@ export function DashboardClient({
       }
       if (payload.rfy_source === 'ai' || payload.rfy_source === 'fallback') {
         setRfySource(payload.rfy_source);
+      }
+      if ('metrics_definition_version' in payload) {
+        const v = payload.metrics_definition_version;
+        setMetricsDefinitionVersion(typeof v === 'string' ? v : null);
       }
     } catch {
       // ignore poll errors
@@ -297,8 +306,6 @@ export function DashboardClient({
         const status = (await statusRes.json()) as { version?: number };
         const version = typeof status.version === 'number' ? status.version : 0;
         if (cancelled) return;
-
-        setMetricsVersion(version);
 
         const shouldRefresh =
           force ||
@@ -777,7 +784,7 @@ export function DashboardClient({
             : null
         }
         benchmarkSummary={benchmarkOneLiner}
-        metricsVersion={metricsVersion}
+        metricsDefinitionVersion={metricsDefinitionVersion}
         datePreset={datePreset}
         onDatePresetChange={(value) => setDatePreset(value as DatePreset)}
         nextDecision={nextDecision}

@@ -11,6 +11,7 @@ import {
   validateImportGroupsAgainstCampaign,
   persistSuphoImportGroups,
 } from '@/lib/supho/import-external-responses';
+import { persistSuphoImportKnowledgeSnapshot } from '@/lib/org/knowledge';
 
 const MAX_FILE_BYTES = 12 * 1024 * 1024;
 
@@ -55,6 +56,9 @@ export async function POST(req: NextRequest) {
   let orgId: string;
   let campaignId: string;
   let groups: SuphoImportGroup[];
+  let multipartArtifact:
+    | { buf: Buffer; filename: string; mimeType: string; sizeBytes: number }
+    | null = null;
 
   if (contentType.includes('multipart/form-data')) {
     const formData = await req.formData();
@@ -93,6 +97,13 @@ export async function POST(req: NextRequest) {
     } else {
       groups = parsedFile.groups;
     }
+
+    multipartArtifact = {
+      buf,
+      filename: file.name || 'import.csv',
+      mimeType: file.type || 'application/octet-stream',
+      sizeBytes: file.size,
+    };
   } else if (contentType.includes('application/json')) {
     let body: unknown;
     try {
@@ -185,11 +196,31 @@ export async function POST(req: NextRequest) {
       metadata: { respondents, answer_rows: answerRows },
     });
 
+    let importFileId: string | null = null;
+    if (multipartArtifact) {
+      const snap = await persistSuphoImportKnowledgeSnapshot(admin, {
+        orgId,
+        campaignId,
+        userId: user.id,
+        buf: multipartArtifact.buf,
+        filename: multipartArtifact.filename,
+        mimeType: multipartArtifact.mimeType,
+        sizeBytes: multipartArtifact.sizeBytes,
+      });
+      if (snap.ok) {
+        importFileId = snap.id;
+      } else {
+        console.warn('[supho/import-responses] persistência do arquivo no repositório:', snap.error);
+      }
+    }
+
     return NextResponse.json({
       ok: true,
       respondents,
       answer_rows: answerRows,
       campaign_id: campaignId,
+      import_file_id: importFileId,
+      import_file_saved: importFileId != null,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

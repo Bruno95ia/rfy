@@ -28,8 +28,14 @@ async function resolveOrgAndRequireManage(
     return { ok: false, res: NextResponse.json({ error: 'Sem permissão' }, { status: 403 }) };
   }
   const role = await getOrgMemberRole(userId, orgId);
-  if (!role || (role !== 'owner' && role !== 'admin')) {
-    return { ok: false, res: NextResponse.json({ error: 'Apenas owner ou admin podem convidar' }, { status: 403 }) };
+  if (!role || !['owner', 'admin', 'manager'].includes(role)) {
+    return {
+      ok: false,
+      res: NextResponse.json(
+        { error: 'Apenas proprietário, administrador ou gestor podem convidar' },
+        { status: 403 }
+      ),
+    };
   }
   return { ok: true, orgId };
 }
@@ -96,6 +102,18 @@ export async function POST(req: NextRequest) {
 
   const check = await resolveOrgAndRequireManage(user.id, org_id ?? null);
   if (!check.ok) return check.res;
+
+  const inviterRole = await getOrgMemberRole(user.id, check.orgId);
+  if (
+    parsed.data.role === 'admin' &&
+    inviterRole !== 'owner' &&
+    inviterRole !== 'admin'
+  ) {
+    return NextResponse.json(
+      { error: 'Apenas proprietário ou administrador podem convidar com papel de administrador' },
+      { status: 403 }
+    );
+  }
 
   const admin = createAdminClient();
 

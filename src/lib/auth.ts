@@ -7,13 +7,18 @@ import { DB_UNAVAILABLE_MESSAGE } from '@/lib/db';
 function isRecoverableAdminError(err: { message: string } | null | undefined): boolean {
   if (!err?.message) return false;
   const m = err.message;
+  const lower = m.toLowerCase();
   return (
     m === DB_UNAVAILABLE_MESSAGE ||
     m.includes('Base de dados não configurada') ||
     m.includes('ECONNREFUSED') ||
     m.includes('ETIMEDOUT') ||
     m.includes('ENOTFOUND') ||
-    m.includes('timeout')
+    m.includes('timeout') ||
+    /** Schema/migração em falta ou tabela ainda não criada — melhor degradar do que derrubar o layout /app */
+    lower.includes('does not exist') ||
+    lower.includes('42p01') ||
+    lower.includes('undefined_table')
   );
 }
 
@@ -158,16 +163,49 @@ export async function provisionOrgOnFirstLogin(userId: string) {
 
 /**
  * Obtém org_id do usuário.
+ * Com várias organizações, prefere a de maior privilégio (owner → admin → manager → viewer)
+ * e desempata por org_id estável — evita lista vazia de dados quando o primeiro registo sem ORDER BY era outra org.
  */
 export async function getOrgIdForUser(userId: string): Promise<string | null> {
   const admin = createAdminClient();
   const { data, error } = (await admin
     .from('org_members')
-    .select('org_id')
+    .select('org_id, role')
+    .eq('user_id', userId)) as {
+    data: { org_id: string; role?: string | null }[] | null;
+    error: { message: string } | null;
+  };
+  if (error || !data?.length) return null;
+  const sorted = [...data].sort((a, b) => {
+    const ra = (a.role as OrgRole) ?? 'viewer';
+    const rb = (b.role as OrgRole) ?? 'viewer';
+    const wa = ROLE_WEIGHT[ra in ROLE_WEIGHT ? ra : 'viewer'];
+    const wb = ROLE_WEIGHT[rb in ROLE_WEIGHT ? rb : 'viewer'];
+    if (wb !== wa) return wb - wa;
+    return String(a.org_id).localeCompare(String(b.org_id));
+  });
+  return sorted[0]?.org_id ?? null;
+}
+
+/**
+ * Papel do utilizador na organização ativa (a mesma lógica de prioridade que {@link getOrgIdForUser}).
+ */
+export async function getOrgRoleForUser(userId: string): Promise<OrgRole | null> {
+  const orgId = await getOrgIdForUser(userId);
+  if (!orgId) return null;
+  const admin = createAdminClient();
+  const { data, error } = (await admin
+    .from('org_members')
+    .select('role')
     .eq('user_id', userId)
-    .limit(1)) as { data: { org_id: string }[] | null; error: { message: string } | null };
-  if (error) return null;
-  return data?.[0]?.org_id ?? null;
+    .eq('org_id', orgId)
+    .maybeSingle()) as {
+    data: { role?: string | null } | null;
+    error: { message: string } | null;
+  };
+  if (error || !data) return 'viewer';
+  const r = (data.role ?? 'viewer') as OrgRole;
+  return r in ROLE_WEIGHT ? r : 'viewer';
 }
 
 /**
@@ -309,8 +347,9 @@ export async function getOrgMemberRole(
       .maybeSingle()) as { error?: { message: string }; data?: { role?: string } };
     const { error, data } = result;
     if (error) return isMissingRoleColumnError(error.message) ? 'owner' : null;
-    const role = data?.role as OrgRole | undefined;
-    if (!role || !(role in ROLE_WEIGHT)) return null;
+    if (!data) return null;
+    const role = data.role as OrgRole | undefined;
+    if (!role || !(role in ROLE_WEIGHT)) return 'viewer';
     return role;
   } catch {
     return null;

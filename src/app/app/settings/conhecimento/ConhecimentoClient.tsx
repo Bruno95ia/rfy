@@ -49,10 +49,15 @@ function FileListRow({
           {new Date(f.created_at).toLocaleString('pt-BR')}
         </p>
       </div>
-      <div className="flex shrink-0 items-center justify-end gap-2 sm:justify-start">
+      <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 sm:justify-start">
         <Badge variant="outline" className="text-xs">
           {scopeLabel}
         </Badge>
+        {f.label === 'supho_import' && (
+          <Badge variant="outline" className="text-xs">
+            Importação SUPHO
+          </Badge>
+        )}
         {canEdit && (
           <Button
             type="button"
@@ -205,7 +210,8 @@ export function ConhecimentoClient() {
             Enviar documento
           </CardTitle>
           <p className="text-sm text-[var(--color-text-muted)]">
-            Qualquer tipo de arquivo (até 50 MB). Texto legível entra no diagnóstico; binários são apenas referenciados.
+            Até 50 MB. Texto, Markdown, CSV, PDF (texto), DOCX e Excel (XLS/XLSX) têm o conteúdo extraído para o diagnóstico;
+            PDF digitalizado ou formatos não suportados aparecem só como referência.
           </p>
         </CardHeader>
         <CardContent>

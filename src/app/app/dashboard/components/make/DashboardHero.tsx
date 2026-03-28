@@ -18,7 +18,8 @@ interface DashboardHeroProps {
   suphoScore: number | null;
   suphoLabel: string | null;
   benchmarkSummary: string | null;
-  metricsVersion: number | null;
+  /** Semver das definições RFY do último snapshot (docs/METRICAS_RFY_DEFINICOES.md) */
+  metricsDefinitionVersion: string | null;
   datePreset: string;
   onDatePresetChange: (value: string) => void;
   nextDecision?: HeroDecision | null;
@@ -32,7 +33,7 @@ export function DashboardHero({
   suphoScore,
   suphoLabel,
   benchmarkSummary,
-  metricsVersion,
+  metricsDefinitionVersion,
   datePreset,
   onDatePresetChange,
   nextDecision = null,
@@ -53,7 +54,11 @@ export function DashboardHero({
                 <TrendingUp className="h-3.5 w-3.5" aria-hidden />
                 RFY Index principal
               </Badge>
-              {metricsVersion != null && <Badge variant="outline">Versão v{metricsVersion}</Badge>}
+              {metricsDefinitionVersion != null && metricsDefinitionVersion !== '' && (
+                <Badge variant="outline" title="Versão das regras de métricas RFY usadas neste relatório">
+                  Definições RFY v{metricsDefinitionVersion}
+                </Badge>
+              )}
             </div>
 
             <div className="mt-4 flex flex-wrap items-end gap-3">

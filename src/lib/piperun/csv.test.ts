@@ -56,8 +56,8 @@ describe('parseBRDateTime', () => {
   it('parse datetime completo', () => {
     expect(parseBRDateTime('08/01/2021 14:00:00')).toBe('2021-01-08T14:00:00Z');
   });
-  it('fallback para só data', () => {
-    expect(parseBRDateTime('08/01/2021')).toBe('2021-01-08');
+  it('sem hora: usa a data e normaliza para meio-dia UTC (compatível com parseDateFlexible)', () => {
+    expect(parseBRDateTime('08/01/2021')).toBe('2021-01-08T12:00:00Z');
   });
 });
 

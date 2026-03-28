@@ -143,7 +143,13 @@ export async function POST(req: NextRequest) {
 
     const ctxForBundle = (ctxRows ?? []) as Array<{ doc_key: string; body_markdown: string | null }>;
     let bundle = buildOrgContextBundleText(ctxForBundle);
-    bundle = await appendKnowledgeFilesToBundle(admin, orgId, campaignId, bundle);
+    const { bundle: bundleWithKnowledge, knowledgeFilesUsed } = await appendKnowledgeFilesToBundle(
+      admin,
+      orgId,
+      campaignId,
+      bundle
+    );
+    bundle = bundleWithKnowledge;
     const orgContextSummary = truncateOrgContextForResultJson(bundle);
 
     const resultJson = {
@@ -166,6 +172,7 @@ export async function POST(req: NextRequest) {
       },
       orgContextPresent: bundle.trim().length > 0,
       orgContextSummary: orgContextSummary || null,
+      knowledgeFilesUsed,
     };
 
     const { error: insertError } = await admin.from('supho_diagnostic_results').insert({

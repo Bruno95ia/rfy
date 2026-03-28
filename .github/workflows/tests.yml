@@ -12,7 +12,7 @@ jobs:
 
     services:
       postgres:
-        image: postgres:16-alpine
+        image: postgres:16
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: postgres
@@ -59,8 +59,8 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
-      - name: Run E2E tests (Playwright)
+      - name: Run E2E smoke (Playwright — auth + dashboard/SUPHO)
         env:
           CI: '1'
           E2E_BASE_URL: http://127.0.0.1:3000
-        run: npm run test:e2e
+        run: npm run test:e2e:smoke

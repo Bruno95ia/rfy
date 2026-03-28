@@ -160,6 +160,7 @@ export interface Database {
           frictions_json: Json;
           pillar_scores_json: Json;
           impact_json: Json;
+          metrics_definition_version: string;
         };
         Insert: {
           id?: string;
@@ -170,6 +171,7 @@ export interface Database {
           frictions_json?: Json;
           pillar_scores_json?: Json;
           impact_json?: Json;
+          metrics_definition_version?: string;
         };
         Update: Partial<Database['public']['Tables']['reports']['Insert']>;
       };

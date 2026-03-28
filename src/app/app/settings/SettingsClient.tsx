@@ -270,7 +270,9 @@ export function SettingsClient() {
   const [resetDemoError, setResetDemoError] = useState<string | null>(null);
   const [resetDemoSuccess, setResetDemoSuccess] = useState(false);
   const [alertEvents, setAlertEvents] = useState<Array<{ id: string; rule_id: string; severity: string; payload_json: Record<string, unknown>; status: string; created_at: string }>>([]);
-  const [members, setMembers] = useState<Array<{ user_id: string; role: string }>>([]);
+  const [members, setMembers] = useState<
+    Array<{ user_id: string; role: string; email?: string | null }>
+  >([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [pendingInvites, setPendingInvites] = useState<Array<{ id: string; email: string; role: string; expires_at: string; created_at: string }>>([]);
   const [inviteEmail, setInviteEmail] = useState('');
@@ -279,6 +281,7 @@ export function SettingsClient() {
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [revokeLoading, setRevokeLoading] = useState<string | null>(null);
   const [removeMemberLoading, setRemoveMemberLoading] = useState<string | null>(null);
+  const [memberRoleSaving, setMemberRoleSaving] = useState<string | null>(null);
   const [people, setPeople] = useState<
     Array<{
       id: string;
@@ -359,7 +362,10 @@ export function SettingsClient() {
             fetch(`/api/org/members?org_id=${encodeURIComponent(oid)}`),
             fetch(`/api/org/invites?org_id=${encodeURIComponent(oid)}`),
           ]);
-          const memData = (await memRes.json()) as { members?: Array<{ user_id: string; role: string }>; current_user_id?: string };
+          const memData = (await memRes.json()) as {
+            members?: Array<{ user_id: string; role: string; email?: string | null }>;
+            current_user_id?: string;
+          };
           const invData = (await invRes.json()) as { invites?: Array<{ id: string; email: string; role: string; expires_at: string; created_at: string }> };
           setMembers(memData.members ?? []);
           setCurrentUserId(memData.current_user_id ?? null);
@@ -522,6 +528,10 @@ export function SettingsClient() {
     (usage.users / Math.max(1, planLimits.users)) * 100
   );
   const canManage = role === 'owner' || role === 'admin';
+  /** Gestão de equipa, convites e pessoas (ICP): inclui gestor (manager). */
+  const canManageOrg = role === 'owner' || role === 'admin' || role === 'manager';
+  /** Só owner/admin podem convidar ou promover a administrador. */
+  const canAssignAdminInvite = role === 'owner' || role === 'admin';
   const searchTokens = panelSearch
     .toLowerCase()
     .trim()
@@ -671,7 +681,7 @@ export function SettingsClient() {
               className="pl-9"
             />
           </div>
-          {!canManage && (
+          {role === 'viewer' && (
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
               Seu perfil é <strong>{role}</strong>. Este painel está em modo leitura para ações de gestão.
             </div>
@@ -1573,17 +1583,71 @@ export function SettingsClient() {
               {members.length === 0 ? (
                 <li className="text-sm text-slate-500">Nenhum membro listado.</li>
               ) : (
-                members.map((m) => (
-                  <li key={m.user_id} className="flex items-center justify-between gap-2 text-sm">
-                    <span className="flex items-center gap-2">
+                members.map((m) => {
+                  const canEditThisMember =
+                    canManageOrg &&
+                    m.user_id !== currentUserId &&
+                    !(role === 'manager' && (m.role === 'owner' || m.role === 'admin')) &&
+                    !(role === 'admin' && m.role === 'owner');
+                  const canRemoveThisMember =
+                    canManageOrg &&
+                    m.user_id !== currentUserId &&
+                    !(role === 'manager' && (m.role === 'owner' || m.role === 'admin')) &&
+                    !(role === 'admin' && m.role === 'owner');
+                  return (
+                  <li key={m.user_id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                    <span className="flex min-w-0 flex-wrap items-center gap-2">
                       {m.user_id === currentUserId ? (
                         <Badge variant="primary" className="text-xs">Você</Badge>
+                      ) : null}
+                      <span className="truncate text-slate-800">
+                        {m.email ? (
+                          m.email
+                        ) : (
+                          <span className="font-mono text-xs text-slate-500">{m.user_id.slice(0, 8)}…</span>
+                        )}
+                      </span>
+                      {canEditThisMember ? (
+                        <select
+                          className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs"
+                          disabled={memberRoleSaving === m.user_id}
+                          value={m.role}
+                          onChange={async (e) => {
+                            const newRole = e.target.value as 'owner' | 'admin' | 'manager' | 'viewer';
+                            if (newRole === m.role) return;
+                            if (!orgId) return;
+                            setMemberRoleSaving(m.user_id);
+                            try {
+                              const res = await fetch(
+                                `/api/org/members?org_id=${encodeURIComponent(orgId)}`,
+                                {
+                                  method: 'PATCH',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ user_id: m.user_id, role: newRole }),
+                                }
+                              );
+                              const data = await res.json().catch(() => ({}));
+                              if (!res.ok) {
+                                throw new Error((data as { error?: string }).error ?? 'Erro ao atualizar papel');
+                              }
+                              await loadSettings();
+                            } catch (err) {
+                              setError(err instanceof Error ? err.message : 'Erro ao atualizar papel');
+                            } finally {
+                              setMemberRoleSaving(null);
+                            }
+                          }}
+                        >
+                          <option value="viewer">Utilizador</option>
+                          <option value="manager">Gestor</option>
+                          {canAssignAdminInvite && <option value="admin">Administrador</option>}
+                          {role === 'owner' && <option value="owner">Proprietário</option>}
+                        </select>
                       ) : (
-                        <span className="font-mono text-xs text-slate-500">{m.user_id.slice(0, 8)}…</span>
+                        <Badge variant="outline">{m.role}</Badge>
                       )}
-                      <Badge variant="outline">{m.role}</Badge>
                     </span>
-                    {canManage && m.user_id !== currentUserId && (
+                    {canRemoveThisMember && (
                       <Button
                         size="sm"
                         variant="ghost"
@@ -1591,13 +1655,17 @@ export function SettingsClient() {
                         disabled={removeMemberLoading === m.user_id}
                         onClick={async () => {
                           if (!confirm('Remover este membro da organização?')) return;
+                          if (!orgId) return;
                           setRemoveMemberLoading(m.user_id);
                           try {
-                            const res = await fetch('/api/org/members', {
-                              method: 'DELETE',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ user_id: m.user_id }),
-                            });
+                            const res = await fetch(
+                              `/api/org/members?org_id=${encodeURIComponent(orgId)}`,
+                              {
+                                method: 'DELETE',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ user_id: m.user_id }),
+                              }
+                            );
                             const data = await res.json().catch(() => ({}));
                             if (!res.ok) throw new Error((data as { error?: string }).error ?? 'Erro ao remover');
                             await loadSettings();
@@ -1613,7 +1681,8 @@ export function SettingsClient() {
                       </Button>
                     )}
                   </li>
-                ))
+                  );
+                })
               )}
             </ul>
           </div>
@@ -1679,8 +1748,8 @@ export function SettingsClient() {
               </div>
             )}
 
-            {canManage && (
-              <fieldset className={cn(!canManage && 'opacity-75')}>
+            {canManageOrg && (
+              <fieldset className={cn(!canManageOrg && 'opacity-75')}>
                 <p className="mt-4 text-sm font-medium text-slate-700">
                   Cadastrar nova pessoa/envolvido
                 </p>
@@ -1823,6 +1892,7 @@ export function SettingsClient() {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({
+                            ...(orgId ? { org_id: orgId } : {}),
                             full_name: newPersonName.trim(),
                             email: newPersonEmail.trim() || undefined,
                             role_title: newPersonRoleTitle.trim() || undefined,
@@ -1865,7 +1935,7 @@ export function SettingsClient() {
             )}
           </div>
 
-          {canManage && (
+          {canManageOrg && (
             <>
               <div>
                 <p className="mb-2 text-sm font-medium text-slate-700">Convidar por e-mail</p>
@@ -1880,12 +1950,12 @@ export function SettingsClient() {
                   </div>
                   <select
                     className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
-                    value={inviteRole}
+                    value={!canAssignAdminInvite && inviteRole === 'admin' ? 'viewer' : inviteRole}
                     onChange={(e) => setInviteRole(e.target.value as 'admin' | 'manager' | 'viewer')}
                   >
-                    <option value="viewer">Viewer</option>
-                    <option value="manager">Manager</option>
-                    <option value="admin">Admin</option>
+                    <option value="viewer">Utilizador (viewer)</option>
+                    <option value="manager">Gestor (manager)</option>
+                    {canAssignAdminInvite && <option value="admin">Administrador (admin)</option>}
                   </select>
                   <Button
                     disabled={inviteLoading || !inviteEmail.trim()}
@@ -1893,10 +1963,16 @@ export function SettingsClient() {
                       setInviteError(null);
                       setInviteLoading(true);
                       try {
+                        const roleToSend =
+                          !canAssignAdminInvite && inviteRole === 'admin' ? 'viewer' : inviteRole;
                         const res = await fetch('/api/org/invites', {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ email: inviteEmail.trim(), role: inviteRole }),
+                          body: JSON.stringify({
+                            email: inviteEmail.trim(),
+                            role: roleToSend,
+                            ...(orgId ? { org_id: orgId } : {}),
+                          }),
                         });
                         const data = await res.json().catch(() => ({}));
                         if (!res.ok) throw new Error((data as { error?: string }).error ?? 'Erro ao enviar convite');

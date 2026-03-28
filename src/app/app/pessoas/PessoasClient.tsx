@@ -21,7 +21,7 @@ type Person = {
   created_at: string;
 };
 
-export function PessoasClient() {
+export function PessoasClient({ initialOrgId = '' }: { initialOrgId?: string }) {
   const [people, setPeople] = useState<Person[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -31,6 +31,7 @@ export function PessoasClient() {
     setLoading(true);
     try {
       const params = new URLSearchParams();
+      if (initialOrgId) params.set('org_id', initialOrgId);
       if (search) params.set('q', search);
       if (typeFilter) params.set('person_type', typeFilter);
       const res = await fetch(`/api/org/people?${params}`);
@@ -39,7 +40,7 @@ export function PessoasClient() {
     } finally {
       setLoading(false);
     }
-  }, [search, typeFilter]);
+  }, [search, typeFilter, initialOrgId]);
 
   useEffect(() => {
     load();

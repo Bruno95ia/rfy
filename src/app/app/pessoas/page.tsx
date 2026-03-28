@@ -1,9 +1,10 @@
-import { requireAuth } from '@/lib/auth';
+import { requireAuth, getOrgIdForUser } from '@/lib/auth';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { PessoasClient } from './PessoasClient';
 
 export default async function PessoasPage() {
-  await requireAuth();
+  const { user } = await requireAuth();
+  const orgId = await getOrgIdForUser(user.id);
 
   return (
     <div className="space-y-6">
@@ -15,7 +16,7 @@ export default async function PessoasPage() {
         title="Pessoas da organização"
         subtitle="Contatos e stakeholders vinculados à sua org. Gerencie também em Configurações."
       />
-      <PessoasClient />
+      <PessoasClient initialOrgId={orgId ?? ''} />
     </div>
   );
 }

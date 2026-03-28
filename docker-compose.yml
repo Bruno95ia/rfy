@@ -45,7 +45,8 @@ services:
     restart: unless-stopped
 
   postgres:
-    image: postgres:16-alpine
+    # Imagem completa (não -alpine): evita falhas intermitentes do daemon "layer does not exist" em alguns hosts.
+    image: postgres:16
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}

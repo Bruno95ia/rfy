@@ -2,6 +2,11 @@
 
 MVP SaaS para análise de fricções de receita a partir de CSVs do PipeRun. Dashboard com métricas de pipeline, fricções e pillar scores.
 
+## Documentação do sistema
+
+- **[Documentação técnica completa (consolidada)](docs/SISTEMA-DOCUMENTACAO-COMPLETA.md)** — arquitetura, auth, APIs, dados, env, testes e índice da pasta `docs/`.
+- Outros guias temáticos: metodologia SUPHO, design, infra, métricas — ver secção “Documentação relacionada” nesse ficheiro.
+
 ## Stack
 
 - **Next.js** (App Router) + TypeScript + Tailwind

@@ -1,7 +1,17 @@
-import { requireAuth, provisionOrgOnFirstLogin } from '@/lib/auth';
-import { createClient } from '@/lib/supabase/server';
-import { getOrgIdForUser } from '@/lib/auth';
+import { requireAuth, provisionOrgOnFirstLogin, getOrgIdForUser } from '@/lib/auth';
+import { getOrgDisplayName } from '@/lib/org/display';
 import { AppShell } from '@/components/layout/AppShell';
+import { isAiServiceConfigured } from '@/lib/ai-deployment';
+
+function isNextRedirectError(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'digest' in error &&
+    typeof (error as { digest: unknown }).digest === 'string' &&
+    (error as { digest: string }).digest.startsWith('NEXT_REDIRECT')
+  );
+}
 
 export default async function AppLayout({
   children,
@@ -10,19 +20,19 @@ export default async function AppLayout({
 }) {
   const { user } = await requireAuth();
 
-  await provisionOrgOnFirstLogin(user.id);
-
-  const supabase = await createClient();
-  const orgId = await getOrgIdForUser(user.id);
-
-  let orgName = 'Minha organização';
-  if (orgId) {
-    const { data: org } = await supabase.from('orgs').select('name').eq('id', orgId).single();
-    orgName = org?.name ?? orgName;
+  try {
+    await provisionOrgOnFirstLogin(user.id);
+  } catch (e) {
+    if (isNextRedirectError(e)) throw e;
+    console.error('[AppLayout] provisionOrgOnFirstLogin', e);
   }
 
+  const orgId = await getOrgIdForUser(user.id);
+
+  const orgName = orgId ? await getOrgDisplayName(orgId) : 'Minha organização';
+
   return (
-    <AppShell userEmail={user.email ?? ''} orgName={orgName}>
+    <AppShell userEmail={user.email ?? ''} orgName={orgName} aiActive={isAiServiceConfigured()}>
       {children}
     </AppShell>
   );

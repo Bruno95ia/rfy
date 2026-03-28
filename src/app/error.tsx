@@ -28,10 +28,24 @@ export default function GlobalError({
         <p className="max-w-md text-sm text-slate-600">
           Ocorreu um erro inesperado. Tente novamente ou acesse a página inicial.
         </p>
+        <details className="max-w-lg text-left">
+          <summary className="cursor-pointer text-xs font-medium text-slate-500">
+            Detalhes técnicos (para diagnóstico)
+          </summary>
+          <p className="mt-2 break-words rounded-md border border-red-100 bg-red-50 px-3 py-2 font-mono text-xs text-red-900">
+            {error.message || '(sem mensagem)'}
+            {error.digest ? (
+              <span className="mt-1 block text-[11px] text-red-700">digest: {error.digest}</span>
+            ) : null}
+          </p>
+        </details>
         <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
           <Button onClick={reset} variant="default" size="sm">
             <RefreshCw className="mr-2 h-4 w-4" />
             Tentar novamente
+          </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/app/dashboard">Área da app</Link>
           </Button>
           <Button asChild variant="outline" size="sm">
             <Link href="/">Página inicial</Link>

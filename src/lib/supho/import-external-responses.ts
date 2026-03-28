@@ -59,12 +59,11 @@ const RESPONDENT_ALIASES = [
   'participant',
   'participante',
 ];
+/** Só nomes inequívocos de coluna — evitar "question"/"pergunta" soltos (confundem cabeçalhos Google Forms). */
 const QUESTION_ALIASES = [
   'question_id',
   'id_question',
   'pergunta_id',
-  'question',
-  'pergunta',
   'id_pergunta',
   'id_da_pergunta',
   'qid',
@@ -89,6 +88,341 @@ function stripCommentRowsFromMatrix(rows: string[][]): string[][] {
     const first = String(r[0] ?? '').trim();
     return first.length > 0 && !first.startsWith('#');
   });
+}
+
+/** Célula Likert 1–5 ou null se vazia/ inválida (aceita "4,0" / "4.0" de exportações). */
+export function parseLikertCell(raw: unknown): number | null {
+  const t = String(raw ?? '')
+    .trim()
+    .replace(/\s/g, '')
+    .replace(',', '.');
+  if (!t) return null;
+  const n = Number(t);
+  if (!Number.isFinite(n)) return null;
+  const rounded = Math.round(n);
+  if (Math.abs(n - rounded) > 1e-4) return null;
+  if (rounded < 1 || rounded > 5) return null;
+  return rounded;
+}
+
+function columnLikertRatio(dataRows: string[][], colIdx: number): number {
+  let ok = 0;
+  let total = 0;
+  for (const row of dataRows) {
+    const cell = row[colIdx];
+    if (cell === undefined) continue;
+    const s = String(cell).trim();
+    if (!s) continue;
+    total += 1;
+    if (parseLikertCell(s) !== null) ok += 1;
+  }
+  if (total === 0) return 0;
+  return ok / total;
+}
+
+/** Cabeçalhos típicos de metadados (Google Forms / Luma) — não são colunas de pergunta. */
+function isLikelyMetaHeader(header: string): boolean {
+  const nh = normHeader(header);
+  if (!nh) return false;
+  const hints = [
+    'carimbo',
+    'timestamp',
+    'datahora',
+    'data_hora',
+    'email',
+    'e_mail',
+    'endereco',
+    'nome',
+    'name',
+    'sobrenome',
+    'participant',
+    'participante',
+    'submission',
+    'respondent',
+    'telefone',
+    'phone',
+    'mobile',
+    'celular',
+    'cpf',
+    'hora',
+  ];
+  for (const h of hints) {
+    if (nh === h || nh.includes(h)) return true;
+  }
+  return false;
+}
+
+/** Remove colunas vazias à direita (Excel costuma alargar a grelha). */
+function trimTrailingEmptyColumns(rows: string[][]): string[][] {
+  if (rows.length === 0) return rows;
+  let maxW = 0;
+  for (const r of rows) {
+    maxW = Math.max(maxW, r.length);
+  }
+  let last = -1;
+  for (let c = maxW - 1; c >= 0; c--) {
+    let any = false;
+    for (const r of rows) {
+      if (String(r[c] ?? '').trim() !== '') {
+        any = true;
+        break;
+      }
+    }
+    if (any) {
+      last = c;
+      break;
+    }
+  }
+  if (last < 0) return rows;
+  return rows.map((r) => {
+    const out = r.slice(0, last + 1);
+    while (out.length < last + 1) out.push('');
+    return out;
+  });
+}
+
+/** True se existe coluna de ID de pergunta (formato longo). */
+export function hasExplicitQuestionIdColumn(headers: string[]): boolean {
+  const keys = new Set(headers.map((h) => normHeader(h)));
+  for (const a of QUESTION_ALIASES) {
+    if (keys.has(normHeader(a))) return true;
+  }
+  return false;
+}
+
+/**
+ * Exportações Google/Luma: várias colunas, sem question_id — deve usar parseWideFormatMatrix, não o parser longo.
+ */
+export function shouldPreferWideFormat(rows: string[][]): boolean {
+  const expanded = unfoldSingleColumnMatrix(rows);
+  const data = stripCommentRowsFromMatrix(
+    expanded.filter((r) => r.some((c) => String(c).trim() !== ''))
+  );
+  if (data.length < 2) return false;
+  const headers = data[0]!.map((h) => String(h ?? '').trim());
+  if (hasExplicitQuestionIdColumn(headers)) return false;
+  const dataRows = data.slice(1);
+  const firstQ = findFirstQuestionColumnIndex(headers, dataRows);
+  return firstQ >= 0 && headers.length > firstQ;
+}
+
+/** Primeira coluna de notas (formato largo); vários limiares + fallback estilo Google (3 metadados). */
+function findFirstQuestionColumnIndex(headers: string[], dataRows: string[][]): number {
+  const w = headers.length;
+  if (w === 0 || dataRows.length === 0) return -1;
+
+  for (const minRatio of [0.55, 0.4, 0.28]) {
+    for (let c = 0; c < w; c++) {
+      if (columnLikertRatio(dataRows, c) >= minRatio) return c;
+    }
+  }
+
+  let c = 0;
+  while (c < w && isLikelyMetaHeader(headers[c] ?? '')) c += 1;
+  if (c < w && columnLikertRatio(dataRows, c) >= 0.2) return c;
+
+  if (w >= 4 && columnLikertRatio(dataRows, 3) >= 0.15) return 3;
+
+  return -1;
+}
+
+function respondentFromWideMeta(
+  row: string[],
+  headers: string[],
+  metaStart: number,
+  metaEnd: number
+): string {
+  /** Preferir nome legível; e-mail fica em externalId para agrupamento. */
+  for (let c = metaStart; c < metaEnd && c < headers.length; c++) {
+    const nh = normHeader(headers[c] ?? '');
+    if (
+      nh.includes('nome') ||
+      nh === 'name' ||
+      nh.includes('participant') ||
+      nh.includes('participante') ||
+      nh.includes('respondent')
+    ) {
+      const v = String(row[c] ?? '').trim();
+      if (v) return v;
+    }
+  }
+  for (let c = metaStart; c < metaEnd && c < headers.length; c++) {
+    const nh = normHeader(headers[c] ?? '');
+    if (nh.includes('email') || nh === 'email' || nh.includes('e_mail')) {
+      const v = String(row[c] ?? '').trim();
+      if (v) return v;
+    }
+  }
+  for (let c = metaStart; c < metaEnd && c < headers.length; c++) {
+    const v = String(row[c] ?? '').trim();
+    if (v) return v;
+  }
+  return '';
+}
+
+function externalIdFromWideMeta(
+  row: string[],
+  headers: string[],
+  metaStart: number,
+  metaEnd: number
+): string {
+  for (let c = metaStart; c < metaEnd && c < headers.length; c++) {
+    const nh = normHeader(headers[c] ?? '');
+    if (nh.includes('email') || nh === 'email' || nh.includes('e_mail')) {
+      const v = String(row[c] ?? '').trim();
+      if (v) return v;
+    }
+  }
+  return '';
+}
+
+/**
+ * Planilha “larga”: uma linha por respondente; colunas à esquerda = metadados (data, e-mail, nome);
+ * colunas seguintes = notas 1–5 na mesma ordem das perguntas da campanha (UUIDs em `questionIdsOrdered`).
+ */
+export function parseWideFormatMatrix(
+  rows: string[][],
+  questionIdsOrdered: string[]
+): { groups: SuphoImportGroup[]; errors: string[] } {
+  const errors: string[] = [];
+  const expanded = unfoldSingleColumnMatrix(rows);
+  const data = stripCommentRowsFromMatrix(
+    expanded.filter((r) => r.some((c) => String(c).trim() !== ''))
+  );
+  if (data.length < 2) {
+    return { groups: [], errors: ['Arquivo precisa de cabeçalho e pelo menos uma linha de dados'] };
+  }
+  if (questionIdsOrdered.length === 0) {
+    return { groups: [], errors: ['Campanha sem perguntas SUPHO para mapear colunas'] };
+  }
+
+  const rawHeaders = data[0]!.map((h) => String(h ?? '').trim());
+  const rawRows = data.slice(1).map((row) => {
+    const padded = (Array.isArray(row) ? [...row] : []).map((c) => String(c ?? ''));
+    while (padded.length < rawHeaders.length) padded.push('');
+    return padded;
+  });
+  const trimmed = trimTrailingEmptyColumns([rawHeaders, ...rawRows]);
+  const headers = trimmed[0]!;
+  const dataRows = trimmed.slice(1);
+
+  const firstQ = findFirstQuestionColumnIndex(headers, dataRows);
+  if (firstQ < 0) {
+    return {
+      groups: [],
+      errors: [
+        'Formato largo não reconhecido: não há colunas com notas 1–5. Use o formato longo (respondent, question_id, value) ou uma exportação tipo Google Forms.',
+      ],
+    };
+  }
+
+  const qCountFile = headers.length - firstQ;
+  const nCampaign = questionIdsOrdered.length;
+  /** Mais colunas no ficheiro que na campanha: ignora as extra. Menos: importa só as que existem (parcial). */
+  const useCount = Math.min(qCountFile, nCampaign);
+  const idsSlice = questionIdsOrdered.slice(0, useCount);
+
+  if (useCount === 0) {
+    return { groups: [], errors: ['Nenhuma coluna de pergunta após os metadados'] };
+  }
+
+  const groups: SuphoImportGroup[] = [];
+  for (let r = 0; r < dataRows.length; r++) {
+    const row = dataRows[r]!;
+    const line = r + 2;
+    let respondent = respondentFromWideMeta(row, headers, 0, firstQ);
+    const ext = externalIdFromWideMeta(row, headers, 0, firstQ);
+    if (!respondent) {
+      respondent = ext.trim() ? ext : `Respondente (linha ${line})`;
+    }
+    const answers: SuphoImportAnswer[] = [];
+    let rowOk = true;
+    for (let i = 0; i < useCount; i++) {
+      const col = firstQ + i;
+      const rawCell = row[col];
+      const likert = parseLikertCell(rawCell);
+      if (likert === null) {
+        if (String(rawCell ?? '').trim() === '') {
+          continue;
+        }
+        errors.push(
+          `Linha ${line}: coluna "${headers[col] ?? String(col)}" — valor deve ser inteiro de 1 a 5 (recebido: ${String(rawCell).slice(0, 40)})`
+        );
+        rowOk = false;
+        break;
+      }
+      answers.push({ question_id: idsSlice[i]!, value: likert });
+    }
+    if (!rowOk) {
+      continue;
+    }
+    if (answers.length === 0) {
+      errors.push(`Linha ${line}: nenhuma nota 1–5 preenchida nas colunas de pergunta`);
+      continue;
+    }
+    groups.push({
+      groupKey: (ext || respondent).trim(),
+      role: respondent,
+      time_area: null,
+      unit: null,
+      answers,
+    });
+  }
+
+  if (errors.length > 0) {
+    return { groups: [], errors };
+  }
+  if (groups.length === 0) {
+    return { groups: [], errors: ['Nenhuma linha válida no formato largo'] };
+  }
+  return { groups, errors: [] };
+}
+
+/** Matriz bruta (CSV/Excel) para tentar formato longo e largo. JSON → []. */
+export function parseMatrixFromSuphoImportBuffer(buffer: Buffer, filename: string): string[][] {
+  const name = filename.toLowerCase();
+  if (isExcelFilename(name)) {
+    const rows = parseExcelToMatrix(buffer);
+    return rows.filter((r) => r.some((c) => String(c).trim() !== ''));
+  }
+  const text = stripBom(decodeBufferToUtf8String(buffer));
+  const trimmed = text.trim();
+  if (trimmed.startsWith('{') && trimmed.includes('"campaign_id"')) {
+    return [];
+  }
+  const withoutComments = stripCommentLines(text);
+  if (!withoutComments.trim()) {
+    return [];
+  }
+  return parseFlexibleDelimited(withoutComments);
+}
+
+/** IDs das perguntas da campanha na ordem do questionário (para formato largo). */
+export async function getOrderedQuestionIdsForCampaign(
+  admin: AdminDbClientType,
+  campaign: { org_id: string; question_ids: string[] | null | undefined }
+): Promise<string[]> {
+  const orgId = campaign.org_id;
+  const explicit = campaign.question_ids;
+  if (Array.isArray(explicit) && explicit.length > 0) {
+    return [...explicit];
+  }
+  const [rNull, rOrg] = await Promise.all([
+    admin.from('supho_questions').select('id, sort_order').is('org_id', null).order('sort_order', { ascending: true }),
+    admin.from('supho_questions').select('id, sort_order').eq('org_id', orgId).order('sort_order', { ascending: true }),
+  ]);
+  if (rNull.error) throw new Error(rNull.error.message);
+  if (rOrg.error) throw new Error(rOrg.error.message);
+  const byId = new Map<string, { id: string; sort_order: number | null }>();
+  for (const row of (rNull.data ?? []) as Array<{ id: string; sort_order: number | null }>) {
+    byId.set(row.id, row);
+  }
+  for (const row of (rOrg.data ?? []) as Array<{ id: string; sort_order: number | null }>) {
+    byId.set(row.id, row);
+  }
+  return [...byId.values()]
+    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+    .map((x) => x.id);
 }
 
 /** Cabeçalho na primeira linha; colunas com aliases (respondent, question_id, value, …). */
@@ -250,8 +584,11 @@ export function parseSuphoImportFromBuffer(
   }
 
   if (isExcelFilename(name)) {
-    const rows = parseExcelToMatrix(buffer);
-    const parsed = parseSuphoImportMatrix(rows);
+    const matrix = parseMatrixFromSuphoImportBuffer(buffer, name);
+    if (matrix.length === 0) {
+      return { ok: false, error: 'Planilha vazia ou inválida' };
+    }
+    const parsed = parseSuphoImportMatrix(matrix);
     if (parsed.errors.length > 0) {
       return { ok: false, error: parsed.errors.slice(0, 8).join(' | ') };
     }
@@ -272,12 +609,11 @@ export function parseSuphoImportFromBuffer(
     }
   }
 
-  const withoutComments = stripCommentLines(text);
-  if (!withoutComments.trim()) {
+  const matrix = parseMatrixFromSuphoImportBuffer(buffer, name);
+  if (matrix.length === 0) {
     return { ok: false, error: 'Arquivo vazio' };
   }
-  const rows = parseFlexibleDelimited(withoutComments);
-  const parsed = parseSuphoImportMatrix(rows);
+  const parsed = parseSuphoImportMatrix(matrix);
   if (parsed.errors.length > 0) {
     return { ok: false, error: parsed.errors.slice(0, 8).join(' | ') };
   }

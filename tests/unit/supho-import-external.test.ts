@@ -1,9 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import * as XLSX from 'xlsx';
 import {
+  parseLikertCell,
   parseSuphoImportCsv,
   parseSuphoImportFromBuffer,
   parseSuphoImportMatrix,
+  parseWideFormatMatrix,
+  shouldPreferWideFormat,
 } from '@/lib/supho/import-external-responses';
 
 describe('parseSuphoImportCsv', () => {
@@ -55,6 +58,66 @@ describe('parseSuphoImportMatrix (Excel coluna A)', () => {
     const { groups, errors } = parseSuphoImportMatrix(matrix);
     expect(errors).toEqual([]);
     expect(groups[0]!.answers[0]).toEqual({ question_id: qid, value: 5 });
+  });
+});
+
+describe('parseLikertCell', () => {
+  it('aceita inteiros e decimais tipo Excel (4.0)', () => {
+    expect(parseLikertCell('4')).toBe(4);
+    expect(parseLikertCell('4.0')).toBe(4);
+    expect(parseLikertCell('4,0')).toBe(4);
+    expect(parseLikertCell(' 5 ')).toBe(5);
+    expect(parseLikertCell('6')).toBeNull();
+    expect(parseLikertCell('4.5')).toBeNull();
+  });
+});
+
+describe('shouldPreferWideFormat', () => {
+  it('marca exportação tipo Google/Luma (sem question_id, com notas em colunas)', () => {
+    const matrix = [
+      ['Carimbo de data/hora', 'Endereço de e-mail', 'Nome completo', 'Pergunta A', 'Pergunta B'],
+      ['28/03/2025 10:00', 'x@y.com', 'Fulano', '4', '5'],
+    ];
+    expect(shouldPreferWideFormat(matrix)).toBe(true);
+  });
+
+  it('não marca quando existe coluna question_id (formato longo)', () => {
+    const qid = '550e8400-e29b-41d4-a716-446655440000';
+    const matrix = [
+      ['respondent', 'question_id', 'value'],
+      ['Maria', qid, '4'],
+    ];
+    expect(shouldPreferWideFormat(matrix)).toBe(false);
+  });
+});
+
+describe('parseWideFormatMatrix (Google Forms / Luma)', () => {
+  const q1 = '550e8400-e29b-41d4-a716-446655440000';
+  const q2 = '660e8400-e29b-41d4-a716-446655440001';
+
+  it('ignora colunas de pergunta a mais se a campanha tiver menos perguntas', () => {
+    const matrix = [
+      ['data', 'email', 'nome', 'Q1', 'Q2', 'Q3'],
+      ['28/03/2025', 'a@b.com', 'X', '4', '5', '3'],
+    ];
+    const { groups, errors } = parseWideFormatMatrix(matrix, [q1]);
+    expect(errors).toEqual([]);
+    expect(groups[0]!.answers).toEqual([{ question_id: q1, value: 4 }]);
+  });
+
+  it('mapeia colunas de pergunta após metadados na ordem dos UUIDs da campanha', () => {
+    const matrix = [
+      ['Carimbo de data/hora', 'Endereço de e-mail', 'Nome', 'Pergunta A', 'Pergunta B'],
+      ['28/03/2025 10:00:00', 'luma@test.com', 'Luma', '4', '5'],
+    ];
+    const { groups, errors } = parseWideFormatMatrix(matrix, [q1, q2]);
+    expect(errors).toEqual([]);
+    expect(groups).toHaveLength(1);
+    expect(groups[0]!.role).toBe('Luma');
+    expect(groups[0]!.answers).toEqual([
+      { question_id: q1, value: 4 },
+      { question_id: q2, value: 5 },
+    ]);
   });
 });
 

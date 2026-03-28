@@ -6,8 +6,13 @@ import { checkRateLimit } from '@/lib/ratelimit';
 import { checkOrgLimit, recordUsageEvent, appendAuditLog } from '@/lib/billing';
 import type { SuphoImportGroup } from '@/lib/supho/import-external-responses';
 import {
+  getOrderedQuestionIdsForCampaign,
+  parseMatrixFromSuphoImportBuffer,
   parseSuphoImportFromBuffer,
   parseSuphoImportJson,
+  parseSuphoImportMatrix,
+  parseWideFormatMatrix,
+  shouldPreferWideFormat,
   validateImportGroupsAgainstCampaign,
   persistSuphoImportGroups,
 } from '@/lib/supho/import-external-responses';
@@ -22,20 +27,61 @@ const postJsonSchema = z.object({
   responses: z.array(z.unknown()).min(1),
 });
 
-/** GET: modelo CSV (cabeçalhos) para importação SUPHO externa. */
-export async function GET() {
+/** Modelo formato LARGO (tipo exportação Google Forms / Luma / Excel “Diagnóstico SUPHO — … (respostas)”). */
+const CSV_TEMPLATE_WIDE =
+  '# Diagnóstico SUPHO — modelo LARGO (uma linha por respondente)\n' +
+  '# Igual às planilhas “Foodtest / Luma / Thiago (respostas)”: metadados à esquerda; depois uma coluna por pergunta (1 a 5).\n' +
+  '# Número e ordem das colunas de pergunta devem alinhar com a campanha e /api/supho/questions (pode apagar colunas a mais ou copiar do seu export).\n' +
+  '# Linhas com # são ignoradas na importação.\n' +
+  '#\n' +
+  'Carimbo de data/hora,Endereço de e-mail,Nome completo,' +
+  [
+    'Pergunta 1',
+    'Pergunta 2',
+    'Pergunta 3',
+    'Pergunta 4',
+    'Pergunta 5',
+    'Pergunta 6',
+    'Pergunta 7',
+    'Pergunta 8',
+    'Pergunta 9',
+    'Pergunta 10',
+    'Pergunta 11',
+    'Pergunta 12',
+    'Pergunta 13',
+    'Pergunta 14',
+    'Pergunta 15',
+    'Pergunta 16',
+    'Pergunta 17',
+    'Pergunta 18',
+  ].join(',') +
+  '\n' +
+  '# Exemplo (apague ou substitua pelas suas linhas de resposta):\n' +
+  '# 28/03/2026 15:42:00,exemplo@empresa.com,Exemplo Nome,4,3,5,4,3,5,4,3,5,4,3,5,4,3,5,4,3,5,4\n';
+
+/** Modelo formato LONGO (uma linha por resposta; question_id = UUID). */
+const CSV_TEMPLATE_LONG =
+  '# Diagnóstico SUPHO — modelo LONGO (uma linha por resposta × pergunta)\n' +
+  '# question_id = UUID em /api/supho/questions. value = inteiro 1 a 5.\n' +
+  '#\n' +
+  'respondent,question_id,value,time_area,unit,external_id\n';
+
+/** GET: modelo CSV. ?variant=wide (padrão, tipo Luma/Google) | ?variant=long */
+export async function GET(req: NextRequest) {
   const auth = await requireApiAuth();
   if (!auth.ok) return auth.response;
 
-  const header =
-    'respondent,question_id,value,time_area,unit,external_id\n' +
-    '# Uma linha por resposta. respondent = nome/papel; external_id opcional para distinguir homônimos.\n' +
-    '# question_id = UUID da pergunta (veja /api/supho/questions). value = 1 a 5.\n';
-  return new NextResponse(header, {
+  const variant = req.nextUrl.searchParams.get('variant')?.toLowerCase();
+  const useLong = variant === 'long' || variant === 'longo';
+
+  const body = '\ufeff' + (useLong ? CSV_TEMPLATE_LONG : CSV_TEMPLATE_WIDE);
+  const filename = useLong ? 'modelo-supho-import-longo.csv' : 'modelo-supho-import-largo.csv';
+
+  return new NextResponse(body, {
     status: 200,
     headers: {
       'Content-Type': 'text/csv; charset=utf-8',
-      'Content-Disposition': 'attachment; filename="modelo-supho-import.csv"',
+      'Content-Disposition': `attachment; filename="${filename}"`,
     },
   });
 }
@@ -55,7 +101,12 @@ export async function POST(req: NextRequest) {
 
   let orgId: string;
   let campaignId: string;
-  let groups: SuphoImportGroup[];
+  let groups: SuphoImportGroup[] | undefined;
+  /** Se formato longo falhar, tentamos largo após carregar a campanha. */
+  let multipartWideMatrix: string[][] | null = null;
+  let multipartLongResult: { groups: SuphoImportGroup[]; errors: string[] } | null = null;
+  /** Google/Luma: sem coluna question_id — não parsear como longo (evita erro “question_id vazio”). */
+  let multipartPreferWide = false;
   let multipartArtifact:
     | { buf: Buffer; filename: string; mimeType: string; sizeBytes: number }
     | null = null;
@@ -80,13 +131,18 @@ export async function POST(req: NextRequest) {
     campaignId = cId.trim();
 
     const buf = Buffer.from(await file.arrayBuffer());
-    const parsedFile = parseSuphoImportFromBuffer(buf, file.name, { mimeType: file.type });
+    const fname = (file.name || 'import.csv').toLowerCase();
+    const mimeLower = (file.type || '').toLowerCase();
+    const isJsonUpload = fname.endsWith('.json') || mimeLower.includes('json');
 
-    if (!parsedFile.ok) {
-      return NextResponse.json({ error: parsedFile.error }, { status: 400 });
-    }
-
-    if (parsedFile.kind === 'json') {
+    if (isJsonUpload) {
+      const parsedFile = parseSuphoImportFromBuffer(buf, file.name, { mimeType: file.type });
+      if (!parsedFile.ok) {
+        return NextResponse.json({ error: parsedFile.error }, { status: 400 });
+      }
+      if (parsedFile.kind !== 'json') {
+        return NextResponse.json({ error: 'Arquivo JSON inválido para importação SUPHO' }, { status: 400 });
+      }
       if (parsedFile.campaign_id !== campaignId) {
         return NextResponse.json(
           { error: 'campaign_id do arquivo difere do campaign_id enviado no formulário' },
@@ -95,7 +151,20 @@ export async function POST(req: NextRequest) {
       }
       groups = parsedFile.groups;
     } else {
-      groups = parsedFile.groups;
+      multipartWideMatrix = parseMatrixFromSuphoImportBuffer(buf, file.name);
+      if (multipartWideMatrix.length === 0) {
+        return NextResponse.json(
+          { error: 'Arquivo vazio ou não foi possível ler como CSV/Excel' },
+          { status: 400 }
+        );
+      }
+      multipartPreferWide = shouldPreferWideFormat(multipartWideMatrix);
+      if (!multipartPreferWide) {
+        multipartLongResult = parseSuphoImportMatrix(multipartWideMatrix);
+        if (multipartLongResult.errors.length === 0) {
+          groups = multipartLongResult.groups;
+        }
+      }
     }
 
     multipartArtifact = {
@@ -172,6 +241,39 @@ export async function POST(req: NextRequest) {
     org_id: string;
     question_ids: string[] | null;
   };
+
+  const shouldTryWide =
+    groups === undefined &&
+    multipartWideMatrix &&
+    (multipartPreferWide ||
+      (multipartLongResult != null && multipartLongResult.errors.length > 0));
+
+  if (shouldTryWide) {
+    try {
+      const qIds = await getOrderedQuestionIdsForCampaign(admin, campaignRow);
+      const wide = parseWideFormatMatrix(multipartWideMatrix!, qIds);
+      if (wide.errors.length > 0) {
+        const longErr = multipartLongResult?.errors?.[0];
+        const msg = longErr ? `${longErr} | ${wide.errors[0]}` : wide.errors[0];
+        return NextResponse.json({ error: msg }, { status: 400 });
+      }
+      groups = wide.groups;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      const longErr = multipartLongResult?.errors?.[0];
+      const err = longErr
+        ? `${longErr} | Falha ao mapear perguntas: ${msg}`
+        : `Falha ao mapear perguntas: ${msg}`;
+      return NextResponse.json({ error: err }, { status: 400 });
+    }
+  }
+
+  if (groups === undefined) {
+    return NextResponse.json(
+      { error: multipartLongResult?.errors[0] ?? 'Não foi possível interpretar o arquivo' },
+      { status: 400 }
+    );
+  }
 
   const validate = await validateImportGroupsAgainstCampaign(admin, campaignRow, groups);
   if (!validate.ok) {

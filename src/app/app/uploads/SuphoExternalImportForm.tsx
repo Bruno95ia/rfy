@@ -149,7 +149,7 @@ export function SuphoExternalImportForm({ orgId }: Props) {
       <div className="grid gap-3 text-xs text-slate-500 sm:grid-cols-3">
         <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
           <FileSpreadsheet className="h-4 w-4 text-indigo-500" />
-          Formato longo: respondent, question_id, value — ou formato largo (Google/Luma): uma linha por pessoa
+          Google Forms: exportar para Excel/CSV no Sheets (uma linha por resposta; colunas de escala 1–5). Ou formato longo com question_id (UUID).
         </div>
         <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
           <FileJson className="h-4 w-4 text-indigo-500" />
@@ -180,9 +180,10 @@ export function SuphoExternalImportForm({ orgId }: Props) {
           className="block w-full text-sm text-slate-600 file:mr-4 file:rounded-lg file:border-0 file:bg-indigo-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-indigo-700 hover:file:bg-indigo-100 disabled:opacity-50"
         />
         <p className="mt-3 text-xs text-slate-500">
-          Google/Luma: colunas iniciais (data, e-mail, nome…) e depois notas 1–5; colunas a mais são ignoradas;
-          células vazias numa pergunta são ignoradas; números tipo 4,0 são aceites. Coluna A com CSV inteiro
-          também. Ordem das perguntas:{' '}
+          Google Forms: a ordem das colunas de pergunta deve ser a mesma da campanha RFY (primeira coluna de
+          pergunta = primeira pergunta na campanha). Aceita notas 1–5, 4,0 e texto tipo &quot;3 - Concordo&quot;.
+          Metadados (carimbo, e-mail, nome) são ignorados. Colunas a mais são ignoradas; células vazias são
+          ignoradas. Ordem das perguntas:{' '}
           <a href="/api/supho/questions" className="text-indigo-600 hover:underline" target="_blank" rel="noreferrer">
             /api/supho/questions
           </a>

@@ -90,19 +90,34 @@ function stripCommentRowsFromMatrix(rows: string[][]): string[][] {
   });
 }
 
-/** Célula Likert 1–5 ou null se vazia/ inválida (aceita "4,0" / "4.0" de exportações). */
+/**
+ * Célula Likert 1–5 ou null se vazia/ inválida.
+ * Aceita: Excel "4,0"; Google Forms escala linear "3"; texto "3 - Concordo totalmente"; "(4)".
+ */
 export function parseLikertCell(raw: unknown): number | null {
-  const t = String(raw ?? '')
-    .trim()
-    .replace(/\s/g, '')
-    .replace(',', '.');
-  if (!t) return null;
-  const n = Number(t);
-  if (!Number.isFinite(n)) return null;
-  const rounded = Math.round(n);
-  if (Math.abs(n - rounded) > 1e-4) return null;
-  if (rounded < 1 || rounded > 5) return null;
-  return rounded;
+  const t0 = String(raw ?? '').trim();
+  if (!t0) return null;
+
+  const compact = t0.replace(/\s/g, '').replace(',', '.');
+  const nDirect = Number(compact);
+  if (Number.isFinite(nDirect)) {
+    const rounded = Math.round(nDirect);
+    if (Math.abs(nDirect - rounded) > 1e-4) return null;
+    if (rounded < 1 || rounded > 5) return null;
+    return rounded;
+  }
+
+  // Google Forms / Sheets: escala com legenda após hífen/en-dash
+  const dash = t0.match(/^\s*([1-5])\s*[-–—]\s*.+/);
+  if (dash) return Number(dash[1]);
+
+  const onlyParen = t0.match(/^\s*\(\s*([1-5])\s*\)\s*$/);
+  if (onlyParen) return Number(onlyParen[1]);
+
+  const onlyDigit = t0.match(/^\s*([1-5])\s*$/);
+  if (onlyDigit) return Number(onlyDigit[1]);
+
+  return null;
 }
 
 function columnLikertRatio(dataRows: string[][], colIdx: number): number {
@@ -120,35 +135,44 @@ function columnLikertRatio(dataRows: string[][], colIdx: number): number {
   return ok / total;
 }
 
-/** Cabeçalhos típicos de metadados (Google Forms / Luma) — não são colunas de pergunta. */
+/**
+ * Colunas de metadados do Google Forms / Luma (antes das perguntas).
+ * Evitar `includes('nome')` solto — confunde perguntas tipo "Qual o nome da empresa?".
+ */
 function isLikelyMetaHeader(header: string): boolean {
   const nh = normHeader(header);
   if (!nh) return false;
-  const hints = [
-    'carimbo',
-    'timestamp',
-    'datahora',
-    'data_hora',
+
+  const exact = new Set([
+    'nome_completo',
+    'nome',
+    'sobrenome',
+    'primeiro_nome',
+    'ultimo_nome',
     'email',
     'e_mail',
-    'endereco',
-    'nome',
-    'name',
-    'sobrenome',
+    'endereco_de_email',
+    'endereco_de_e_mail',
+    'respondent',
+    'respondente',
     'participant',
     'participante',
-    'submission',
-    'respondent',
-    'telefone',
-    'phone',
-    'mobile',
-    'celular',
-    'cpf',
-    'hora',
-  ];
-  for (const h of hints) {
-    if (nh === h || nh.includes(h)) return true;
-  }
+    'name',
+  ]);
+  if (exact.has(nh)) return true;
+  if (nh.startsWith('nome_completo')) return true;
+
+  if (nh.startsWith('carimbo')) return true;
+  if (nh.includes('timestamp')) return true;
+  if (nh.includes('datahora') || nh.includes('data_hora')) return true;
+  if (nh.includes('submission')) return true;
+  if (nh.includes('telefone') || nh.includes('celular') || nh.includes('cpf')) return true;
+  if (nh.includes('phone') || nh.includes('mobile')) return true;
+  if (nh.includes('endereco') && nh.includes('email')) return true;
+  if (nh.includes('dura') && (nh.includes('segund') || nh.includes('tempo'))) return true;
+  if (nh.includes('resposta_id') || nh.includes('id_da_resposta') || nh.includes('id_resposta')) return true;
+  if (nh.includes('link') && (nh.includes('editar') || nh.includes('edit'))) return true;
+
   return false;
 }
 
@@ -213,6 +237,7 @@ function findFirstQuestionColumnIndex(headers: string[], dataRows: string[][]): 
 
   for (const minRatio of [0.55, 0.4, 0.28]) {
     for (let c = 0; c < w; c++) {
+      if (isLikelyMetaHeader(headers[c] ?? '')) continue;
       if (columnLikertRatio(dataRows, c) >= minRatio) return c;
     }
   }

@@ -70,6 +70,13 @@ describe('parseLikertCell', () => {
     expect(parseLikertCell('6')).toBeNull();
     expect(parseLikertCell('4.5')).toBeNull();
   });
+
+  it('aceita formato Google Forms: número com legenda ou parênteses', () => {
+    expect(parseLikertCell('3 - Concordo totalmente')).toBe(3);
+    expect(parseLikertCell('4 – Neutro')).toBe(4);
+    expect(parseLikertCell('(5)')).toBe(5);
+    expect(parseLikertCell('( 3 )')).toBe(3);
+  });
 });
 
 describe('shouldPreferWideFormat', () => {
@@ -116,6 +123,19 @@ describe('parseWideFormatMatrix (Google Forms / Luma)', () => {
     expect(groups[0]!.role).toBe('Luma');
     expect(groups[0]!.answers).toEqual([
       { question_id: q1, value: 4 },
+      { question_id: q2, value: 5 },
+    ]);
+  });
+
+  it('aceita notas estilo Google Forms com texto após hífen', () => {
+    const matrix = [
+      ['Carimbo de data/hora', 'Endereço de e-mail', 'Nome completo', 'Q1', 'Q2'],
+      ['28/03/2025', 'x@y.com', 'Teste', '3 - Opção', '5 - Máximo'],
+    ];
+    const { groups, errors } = parseWideFormatMatrix(matrix, [q1, q2]);
+    expect(errors).toEqual([]);
+    expect(groups[0]!.answers).toEqual([
+      { question_id: q1, value: 3 },
       { question_id: q2, value: 5 },
     ]);
   });

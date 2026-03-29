@@ -31,7 +31,6 @@ import {
   getOrgContextNarrative,
 } from '@/lib/supho/executive-text';
 import type { ErpIntegrationStatus, SystemsMaturityAssessment } from '@/lib/supho/systems-maturity';
-import { computeITSMO } from '@/lib/supho/calculations';
 import { Gauge, FileText, ClipboardList, ArrowRight, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -210,9 +209,6 @@ export function MaturidadePanelClient({
   const ipt = Number.isFinite(result.ipt) ? Math.round(result.ipt * 100) / 100 : 0;
   const icl = Number.isFinite(result.icl) ? Math.round(result.icl * 100) / 100 : 0;
 
-  const itsmoFromPillars = displayIndex(computeITSMO(ic, ih, ip));
-  const itsmoAligned = Math.abs(itsmoFromPillars - itsmo) < 0.15;
-
   const levelLabel = ITSMO_LEVEL_BANDS.find((b) => b.nivel === result.nivel)?.label ?? 'Reativo';
   const radarData = [
     { subject: `${SUPHO_PILARES.A.nomeCurto} (IC)`, value: ic, fullMark: 100 },
@@ -330,12 +326,11 @@ export function MaturidadePanelClient({
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {!itsmoAligned && (
-              <p className="text-xs text-[var(--color-text-muted)]">
-                Nota: ITSMO armazenado ({itsmo.toFixed(1)}) difere ligeiramente da recomposição 0,40×IC + 0,35×IH +
-                0,25×IP ({itsmoFromPillars.toFixed(1)}) — prevalece o valor guardado no diagnóstico.
-              </p>
-            )}
+            <p className="text-xs text-[var(--color-text-muted)]">
+              ITSMO = 0,40×IC + 0,35×IH + 0,25×IP (metodologia SUPHO). O valor acima é o guardado no diagnóstico; os
+              pilares são arredondados para exibição — pequenas diferenças face à conta manual com os números à vista
+              são normais.
+            </p>
             <p className="text-sm leading-relaxed text-[var(--color-text)]">
               {getExecutiveTextITSMO(result.nivel)}
             </p>

@@ -6,10 +6,16 @@
 import { ITSMO_WEIGHTS, ITSMO_LEVEL_BANDS, LIKERT_MIN, LIKERT_RANGE } from './constants';
 import type { SuphoBlock, SuphoDiagnosticResult, SuphoNivel, SuphoQuestionAverage } from '@/types/supho';
 
-/** Converte média Likert (1–5) para índice 0–100 */
+/** Converte média Likert (1–5) para índice 0–100 (arredondado a 2 casas — exibição / armazenamento por pilar) */
 export function likertTo100(mean: number): number {
   const clamped = Math.max(LIKERT_MIN, Math.min(5, mean));
   return Math.round(((clamped - LIKERT_MIN) / LIKERT_RANGE) * 100 * 100) / 100;
+}
+
+/** Mesma transformação Likert→0–100 sem arredondamento intermédio (para ITSMO = combinação linear correta). */
+function likertTo100Unrounded(mean: number): number {
+  const clamped = Math.max(LIKERT_MIN, Math.min(5, mean));
+  return ((clamped - LIKERT_MIN) / LIKERT_RANGE) * 100;
 }
 
 /** Média ponderada por peso interno (1/2/3). items: array de { average, internalWeight } */
@@ -25,6 +31,18 @@ function weightedMeanByBlock(
     weightSum += w;
   }
   return weightSum > 0 ? sum / weightSum : 0;
+}
+
+/** Índice 0–100 do bloco sem arredondar o Likert→100 (usar na fórmula do ITSMO). */
+export function computeBlockIndexUnrounded(
+  questionAverages: SuphoQuestionAverage[],
+  block: SuphoBlock
+): number {
+  const filtered = questionAverages.filter((q) => q.block === block);
+  const mean = weightedMeanByBlock(
+    filtered.map((q) => ({ average: q.average, internalWeight: q.internalWeight }))
+  );
+  return likertTo100Unrounded(mean);
 }
 
 /** Agrupa médias por bloco e calcula índice 0–100 para o bloco */
@@ -50,12 +68,26 @@ export function computeIndices(
   };
 }
 
-/** ITSMO = IC×0,40 + IH×0,35 + IP×0,25 */
+/** ITSMO = IC×0,40 + IH×0,35 + IP×0,25 (arredondo final a 2 casas). */
 export function computeITSMO(ic: number, ih: number, ip: number): number {
   return Math.round(
     (ic * ITSMO_WEIGHTS.cultura +
       ih * ITSMO_WEIGHTS.humano +
       ip * ITSMO_WEIGHTS.performance) *
+      100
+  ) / 100;
+}
+
+/** ITSMO a partir dos pilares em precisão plena (evita erro ao compor índices já arredondados por bloco). */
+export function computeITSMOFromUnroundedPillars(
+  icRaw: number,
+  ihRaw: number,
+  ipRaw: number
+): number {
+  return Math.round(
+    (icRaw * ITSMO_WEIGHTS.cultura +
+      ihRaw * ITSMO_WEIGHTS.humano +
+      ipRaw * ITSMO_WEIGHTS.performance) *
       100
   ) / 100;
 }
@@ -119,8 +151,13 @@ export function computeDiagnosticResult(
     icl: readonly string[];
   } = DEFAULT_SUBINDEX_ITEMS
 ): SuphoDiagnosticResult {
-  const { ic, ih, ip } = computeIndices(questionAverages);
-  const itsmo = computeITSMO(ic, ih, ip);
+  const rawIc = computeBlockIndexUnrounded(questionAverages, 'A');
+  const rawIh = computeBlockIndexUnrounded(questionAverages, 'B');
+  const rawIp = computeBlockIndexUnrounded(questionAverages, 'C');
+  const ic = Math.round(rawIc * 100) / 100;
+  const ih = Math.round(rawIh * 100) / 100;
+  const ip = Math.round(rawIp * 100) / 100;
+  const itsmo = computeITSMOFromUnroundedPillars(rawIc, rawIh, rawIp);
   const nivel = computeNivel(itsmo);
   const { gapCH, gapCP } = computeGaps(ic, ih, ip);
   const { ise, ipt, icl } = computeSubindices(questionAverages, subindexMapping);

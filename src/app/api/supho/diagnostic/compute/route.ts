@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createAdminClient } from '@/lib/supabase/admin';
 import {
+  computeBlockIndexUnrounded,
   computeDiagnosticResult,
   computeGaps,
-  computeITSMO,
+  computeITSMOFromUnroundedPillars,
   computeNivel,
 } from '@/lib/supho/calculations';
 import { buildOrgContextBundleText, truncateOrgContextForResultJson } from '@/lib/org/context-documents';
@@ -137,7 +138,10 @@ export async function POST(req: NextRequest) {
       erpIntegrationStatus,
     });
     const ipAdjusted = applyIpPenalty(result.ip, systemsAssessment.ipPenalty);
-    const itsmoAdjusted = computeITSMO(result.ic, result.ih, ipAdjusted);
+    const rawIc = computeBlockIndexUnrounded(questionAverages, 'A');
+    const rawIh = computeBlockIndexUnrounded(questionAverages, 'B');
+    const rawIp = computeBlockIndexUnrounded(questionAverages, 'C');
+    const itsmoAdjusted = computeITSMOFromUnroundedPillars(rawIc, rawIh, ipAdjusted);
     const nivelAdjusted = computeNivel(itsmoAdjusted);
     const gapsAdjusted = computeGaps(result.ic, result.ih, ipAdjusted);
 

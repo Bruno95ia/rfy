@@ -79,6 +79,13 @@ export type MaturidadeEnrichment = {
     gapCH: number;
     gapCP: number;
   } | null;
+  /** Metadados do último cálculo: o que entrou nos índices vs texto contextual (result_json). */
+  sourcesUsedInCompute?: {
+    notePt: string;
+    campaignQuestionFilterActive?: boolean;
+    surveyQuestionRowsUsed?: number;
+    surveyQuestionRowsBeforeFilter?: number;
+  } | null;
 } | null;
 
 export type MaturidadeCampaignContext = {
@@ -352,6 +359,24 @@ export function MaturidadePanelClient({
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {enrichment?.sourcesUsedInCompute?.notePt && (
+            <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-3">
+              <p className="text-xs font-semibold uppercase text-[var(--color-text-muted)]">
+                O que entra nos números
+              </p>
+              <p className="mt-2 text-sm leading-relaxed text-[var(--color-text)]">
+                {enrichment.sourcesUsedInCompute.notePt}
+              </p>
+              {enrichment.sourcesUsedInCompute.campaignQuestionFilterActive &&
+                enrichment.sourcesUsedInCompute.surveyQuestionRowsUsed != null &&
+                enrichment.sourcesUsedInCompute.surveyQuestionRowsBeforeFilter != null && (
+                  <p className="mt-2 text-xs text-[var(--color-text-muted)]">
+                    Perguntas com resposta usadas no cálculo: {enrichment.sourcesUsedInCompute.surveyQuestionRowsUsed}{' '}
+                    de {enrichment.sourcesUsedInCompute.surveyQuestionRowsBeforeFilter} (subconjunto definido na campanha).
+                  </p>
+                )}
+            </div>
+          )}
           {enrichment?.systemsMaturity ? (
             <div>
               <p className="text-xs font-semibold uppercase text-[var(--color-text-muted)]">

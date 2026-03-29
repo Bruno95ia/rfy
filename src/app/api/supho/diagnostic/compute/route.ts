@@ -8,8 +8,13 @@ import {
   computeITSMOFromUnroundedPillars,
   computeNivel,
 } from '@/lib/supho/calculations';
-import { buildOrgContextBundleText, truncateOrgContextForResultJson } from '@/lib/org/context-documents';
+import {
+  buildOrgContextBundleText,
+  ORG_CONTEXT_DOCUMENT_DEFS,
+  truncateOrgContextForResultJson,
+} from '@/lib/org/context-documents';
 import { appendKnowledgeFilesToBundle } from '@/lib/org/knowledge';
+import { filterQuestionAveragesForCampaign } from '@/lib/supho/campaign-questions';
 import { assessSystemsMaturity, applyIpPenalty } from '@/lib/supho/systems-maturity';
 import type { SuphoQuestionAverage } from '@/types/supho';
 import { requireApiCampaignAccess } from '@/lib/auth';
@@ -116,8 +121,41 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const result = computeDiagnosticResult(questionAverages);
-    const sampleSize = Math.max(...questionAverages.map((q) => q.count), 0);
+    const { data: campaignRow } = await admin
+      .from('supho_diagnostic_campaigns')
+      .select('question_ids, uploads_context_markdown')
+      .eq('id', campaignId)
+      .maybeSingle();
+    const campaignQuestionIds =
+      campaignRow && typeof campaignRow === 'object' && 'question_ids' in campaignRow
+        ? (campaignRow as { question_ids?: string[] | null }).question_ids
+        : null;
+    const uploadsSynth =
+      campaignRow &&
+      typeof campaignRow === 'object' &&
+      'uploads_context_markdown' in campaignRow
+        ? String(
+            (campaignRow as { uploads_context_markdown?: string | null }).uploads_context_markdown ?? ''
+          ).trim()
+        : '';
+
+    const questionAveragesForCompute = filterQuestionAveragesForCampaign(
+      questionAverages,
+      campaignQuestionIds
+    );
+
+    if (questionAveragesForCompute.length === 0) {
+      return NextResponse.json(
+        {
+          error:
+            'Nenhuma resposta nas perguntas selecionadas para esta campanha. Ajuste a seleção em Diagnóstico ou confira as respostas importadas.',
+        },
+        { status: 400 }
+      );
+    }
+
+    const result = computeDiagnosticResult(questionAveragesForCompute);
+    const sampleSize = Math.max(...questionAveragesForCompute.map((q) => q.count), 0);
 
     const orgId = campaign.org_id;
     const [{ data: crmRows }, { data: cfgRow }, { data: ctxRows }] = await Promise.all([
@@ -138,26 +176,12 @@ export async function POST(req: NextRequest) {
       erpIntegrationStatus,
     });
     const ipAdjusted = applyIpPenalty(result.ip, systemsAssessment.ipPenalty);
-    const rawIc = computeBlockIndexUnrounded(questionAverages, 'A');
-    const rawIh = computeBlockIndexUnrounded(questionAverages, 'B');
-    const rawIp = computeBlockIndexUnrounded(questionAverages, 'C');
+    const rawIc = computeBlockIndexUnrounded(questionAveragesForCompute, 'A');
+    const rawIh = computeBlockIndexUnrounded(questionAveragesForCompute, 'B');
+    const rawIp = computeBlockIndexUnrounded(questionAveragesForCompute, 'C');
     const itsmoAdjusted = computeITSMOFromUnroundedPillars(rawIc, rawIh, ipAdjusted);
     const nivelAdjusted = computeNivel(itsmoAdjusted);
     const gapsAdjusted = computeGaps(result.ic, result.ih, ipAdjusted);
-
-    const { data: campaignSynthRow } = await admin
-      .from('supho_diagnostic_campaigns')
-      .select('uploads_context_markdown')
-      .eq('id', campaignId)
-      .maybeSingle();
-    const uploadsSynth =
-      campaignSynthRow &&
-      typeof campaignSynthRow === 'object' &&
-      'uploads_context_markdown' in campaignSynthRow
-        ? String(
-            (campaignSynthRow as { uploads_context_markdown?: string | null }).uploads_context_markdown ?? ''
-          ).trim()
-        : '';
 
     const ctxForBundle = (ctxRows ?? []) as Array<{ doc_key: string; body_markdown: string | null }>;
     let bundle = buildOrgContextBundleText(ctxForBundle);
@@ -174,9 +198,33 @@ export async function POST(req: NextRequest) {
     bundle = bundleWithKnowledge;
     const orgContextSummary = truncateOrgContextForResultJson(bundle);
 
+    const orgContextSectionCount = ORG_CONTEXT_DOCUMENT_DEFS.filter((def) => {
+      const row = ctxForBundle.find((r) => r.doc_key === def.key);
+      return row && String(row.body_markdown ?? '').trim().length > 0;
+    }).length;
+
     const resultJson = {
       questionAverages: result.questionAverages,
       seed: null,
+      /** Transparência: o que entrou no cálculo numérico vs texto de contexto (documentos não alteram IC/IH/IP). */
+      sourcesUsedInCompute: {
+        numericIndicesFrom: 'survey_likert_only' as const,
+        surveyQuestionRowsUsed: questionAveragesForCompute.length,
+        surveyQuestionRowsBeforeFilter: questionAverages.length,
+        campaignQuestionFilterActive: Boolean(
+          Array.isArray(campaignQuestionIds) && campaignQuestionIds.length > 0
+        ),
+        ipAdjustedBySystemsCrmErp: systemsAssessment.ipPenalty > 0,
+        ipPenaltyPoints: systemsAssessment.ipPenalty,
+        contextTextForSummary: {
+          orgContextMarkdownSectionsFilled: orgContextSectionCount,
+          uploadsSynthesisIncluded: Boolean(uploadsSynth),
+          knowledgeFilesAttached: knowledgeFilesUsed.length,
+          knowledgeFilenamesSample: knowledgeFilesUsed.slice(0, 15).map((f) => f.filename),
+        },
+        notePt:
+          'IC, IH, IP e ITSMO derivam apenas das respostas Likert (1–5) agregadas por bloco, com a seleção de perguntas da campanha quando definida. Documentos de contexto, uploads (síntese) e ficheiros de Conhecimento compõem o texto resumido para leitura; não alteram os índices numéricos. O pilar IP pode ser reduzido por penalidade de maturidade de sistemas (CRM/ERP).',
+      },
       indicesFromSurvey: {
         ic: result.ic,
         ih: result.ih,
@@ -240,6 +288,7 @@ export async function POST(req: NextRequest) {
         indicesFromSurvey: resultJson.indicesFromSurvey,
         systemsMaturity: resultJson.systemsMaturity,
         orgContextPresent: resultJson.orgContextPresent,
+        sourcesUsedInCompute: resultJson.sourcesUsedInCompute,
       },
     });
   } catch (e) {

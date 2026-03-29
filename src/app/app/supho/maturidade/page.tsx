@@ -96,6 +96,29 @@ export default async function MaturidadePage() {
         }
       : null;
 
+  const sourcesRaw = rj?.sourcesUsedInCompute;
+  const sourcesUsedInCompute =
+    result &&
+    sourcesRaw &&
+    typeof sourcesRaw === 'object' &&
+    sourcesRaw !== null &&
+    typeof (sourcesRaw as { notePt?: unknown }).notePt === 'string'
+      ? {
+          notePt: String((sourcesRaw as { notePt: string }).notePt),
+          campaignQuestionFilterActive: (sourcesRaw as { campaignQuestionFilterActive?: unknown })
+            .campaignQuestionFilterActive === true,
+          surveyQuestionRowsUsed:
+            typeof (sourcesRaw as { surveyQuestionRowsUsed?: unknown }).surveyQuestionRowsUsed === 'number'
+              ? (sourcesRaw as { surveyQuestionRowsUsed: number }).surveyQuestionRowsUsed
+              : undefined,
+          surveyQuestionRowsBeforeFilter:
+            typeof (sourcesRaw as { surveyQuestionRowsBeforeFilter?: unknown }).surveyQuestionRowsBeforeFilter ===
+            'number'
+              ? (sourcesRaw as { surveyQuestionRowsBeforeFilter: number }).surveyQuestionRowsBeforeFilter
+              : undefined,
+        }
+      : null;
+
   const enrichment = result
     ? {
         systemsMaturity,
@@ -103,6 +126,7 @@ export default async function MaturidadePage() {
         orgContextSummary:
           typeof rj?.orgContextSummary === 'string' ? rj.orgContextSummary : null,
         uploadsSynthesisUsed: rj?.uploadsSynthesisUsed === true,
+        sourcesUsedInCompute,
         indicesFromSurvey:
           rj?.indicesFromSurvey && typeof rj.indicesFromSurvey === 'object' && rj.indicesFromSurvey !== null
             ? {

@@ -376,7 +376,9 @@ export function SettingsClient() {
         }
         try {
           setPeopleLoading(true);
-          const peopleRes = await fetch(`/api/org/people?org_id=${encodeURIComponent(oid)}`);
+          const peopleRes = await fetch(`/api/org/people?org_id=${encodeURIComponent(oid)}`, {
+            credentials: 'include',
+          });
           const peopleData = (await peopleRes.json()) as {
             people?: Array<{
               id: string;
@@ -1890,6 +1892,7 @@ export function SettingsClient() {
                       try {
                         const res = await fetch('/api/org/people', {
                           method: 'POST',
+                          credentials: 'include',
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({
                             ...(orgId ? { org_id: orgId } : {}),

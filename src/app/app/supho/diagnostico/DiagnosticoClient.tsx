@@ -17,10 +17,19 @@ import {
   Send,
   Save,
   Package,
+  FolderInput,
 } from 'lucide-react';
 import { fetchJsonWithRetry } from '@/lib/supho/fetch-with-retry';
+import { useToast } from '@/components/ui/use-toast';
 
-type Campaign = { id: string; name: string; status: string; created_at: string; question_ids?: string[] | null };
+type Campaign = {
+  id: string;
+  name: string;
+  status: string;
+  created_at: string;
+  question_ids?: string[] | null;
+  uploads_context_updated_at?: string | null;
+};
 type Question = { id: string; block: string; internal_weight: number; question_text: string | null; item_code: string | null; sort_order: number };
 
 interface DiagnosticoClientProps {
@@ -29,6 +38,7 @@ interface DiagnosticoClientProps {
 }
 
 export function DiagnosticoClient({ orgId, initialCampaigns }: DiagnosticoClientProps) {
+  const { toast } = useToast();
   const router = useRouter();
   const [campaigns, setCampaigns] = useState<Campaign[]>(initialCampaigns);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -47,6 +57,12 @@ export function DiagnosticoClient({ orgId, initialCampaigns }: DiagnosticoClient
   const [inviteFailed, setInviteFailed] = useState<Array<{ email: string; name?: string; error?: string }>>([]);
   const [selectedQuestionIds, setSelectedQuestionIds] = useState<string[] | null>(null);
   const [savingQuestionSelection, setSavingQuestionSelection] = useState(false);
+  const [ingestingUploads, setIngestingUploads] = useState(false);
+
+  /** Após router.refresh(), o servidor devolve campanhas novas — manter estado alinhado. */
+  useEffect(() => {
+    setCampaigns(initialCampaigns);
+  }, [initialCampaigns]);
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const parseInviteLines = (text: string): { valid: { email: string; name: string }[]; invalid: string[] } => {
@@ -80,7 +96,7 @@ export function DiagnosticoClient({ orgId, initialCampaigns }: DiagnosticoClient
         : questions.filter((q) => selectedCampaign.question_ids!.includes(q.id));
 
   const fetchCampaigns = useCallback(async () => {
-    const res = await fetch('/api/supho/campaigns');
+    const res = await fetch('/api/supho/campaigns', { credentials: 'include' });
     if (res.ok) {
       const data = await res.json();
       setCampaigns(data);
@@ -110,7 +126,9 @@ export function DiagnosticoClient({ orgId, initialCampaigns }: DiagnosticoClient
 
   const fetchRespondentsCount = useCallback(async (campaignId: string) => {
     try {
-      const r = await fetch(`/api/supho/respondents?campaign_id=${campaignId}`);
+      const r = await fetch(`/api/supho/respondents?campaign_id=${campaignId}`, {
+        credentials: 'include',
+      });
       const data = await r.json();
       const count = Array.isArray(data) ? data.length : (data?.count ?? 0);
       setRespondentsCount((prev) => ({ ...prev, [campaignId]: count }));
@@ -155,6 +173,7 @@ export function DiagnosticoClient({ orgId, initialCampaigns }: DiagnosticoClient
       setCampaigns((prev) => [data as Campaign, ...prev]);
       setSelectedCampaignId((data as Campaign).id);
       setNewCampaignName('');
+      router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -178,6 +197,7 @@ export function DiagnosticoClient({ orgId, initialCampaigns }: DiagnosticoClient
       );
       if (!res.ok) throw new Error(`Guardar seleção de perguntas: ${data?.error ?? `HTTP ${res.status}`}`);
       await fetchCampaigns();
+      router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -227,10 +247,48 @@ export function DiagnosticoClient({ orgId, initialCampaigns }: DiagnosticoClient
 
       setAnswers({});
       setRespondentsCount((prev) => ({ ...prev, [selectedCampaignId]: (prev[selectedCampaignId] ?? 0) + 1 }));
+      router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const ingestUploadsForCampaign = async () => {
+    if (!selectedCampaignId) return;
+    setIngestingUploads(true);
+    setError(null);
+    try {
+      const { res, data } = await fetchJsonWithRetry<{
+        error?: string;
+        ok?: boolean;
+        used_gemini?: boolean;
+        files_count?: number;
+        updated_at?: string;
+      }>(
+        `/api/supho/campaigns/${encodeURIComponent(selectedCampaignId)}/ingest-uploads`,
+        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' },
+        { stepLabel: 'Sintetizar documentos do repositório' }
+      );
+      if (!res.ok) {
+        throw new Error((data as { error?: string })?.error ?? `HTTP ${res.status}`);
+      }
+      const gem = (data as { used_gemini?: boolean }).used_gemini === true;
+      const n = (data as { files_count?: number }).files_count ?? 0;
+      await fetchCampaigns();
+      router.refresh();
+      toast({
+        title: 'Repositório aplicado à campanha',
+        description: gem
+          ? `Síntese gerada com Google Gemini (${n} documento(s)). Será usada ao calcular o resultado.`
+          : `Resumo guardado (${n} documento(s), sem IA). Defina GOOGLE_AI_API_KEY no servidor para síntese com Gemini.`,
+        variant: 'success',
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setIngestingUploads(false);
     }
   };
 
@@ -307,6 +365,7 @@ export function DiagnosticoClient({ orgId, initialCampaigns }: DiagnosticoClient
             ? 'Nenhum convite enviado.'
             : null
       );
+      if (successCount > 0) router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -415,6 +474,44 @@ export function DiagnosticoClient({ orgId, initialCampaigns }: DiagnosticoClient
                 <p className="text-sm text-slate-600">
                   <strong>{count}</strong> respondente(s). Adicione ao menos um com todas as perguntas respondidas (1–5) para calcular o resultado.
                 </p>
+                <div className="rounded-lg border border-indigo-100 bg-indigo-50/40 p-3 text-sm text-slate-700">
+                  <p className="font-medium text-slate-900">Repositório de uploads</p>
+                  <p className="mt-1 text-xs leading-relaxed text-slate-600">
+                    Envie documentos em{' '}
+                    <Link href="/app/settings/conhecimento" className="font-medium text-indigo-600 underline-offset-2 hover:underline">
+                      Configurações → Conhecimento
+                    </Link>
+                    . O botão abaixo agrega <strong>todos</strong> os ficheiros da organização e desta campanha e grava uma
+                    síntese na campanha. Se existir <code className="rounded bg-white/80 px-1 text-[11px]">GOOGLE_AI_API_KEY</code>{' '}
+                    no servidor, é usado o <strong>Google Gemini</strong> para mensurar e resumir o conteúdo; caso contrário,
+                    gera-se um resumo estruturado sem IA. A síntese entra no cálculo do diagnóstico junto aos documentos.
+                  </p>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => void ingestUploadsForCampaign()}
+                      disabled={ingestingUploads}
+                      className="gap-1.5"
+                    >
+                      {ingestingUploads ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <FolderInput className="h-4 w-4" />
+                      )}
+                      Utilizar uploads
+                    </Button>
+                    {selectedCampaign?.uploads_context_updated_at ? (
+                      <span className="text-xs text-slate-500">
+                        Última síntese:{' '}
+                        {new Date(selectedCampaign.uploads_context_updated_at).toLocaleString('pt-BR')}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-slate-500">Ainda sem síntese de uploads nesta campanha.</span>
+                    )}
+                  </div>
+                </div>
                 {questions.length === 0 ? (
                   <div className="space-y-2">
                     <p className="text-sm text-amber-600">

@@ -34,7 +34,7 @@ export function PessoasClient({ initialOrgId = '' }: { initialOrgId?: string }) 
       if (initialOrgId) params.set('org_id', initialOrgId);
       if (search) params.set('q', search);
       if (typeFilter) params.set('person_type', typeFilter);
-      const res = await fetch(`/api/org/people?${params}`);
+      const res = await fetch(`/api/org/people?${params}`, { credentials: 'include' });
       const data = await res.json();
       setPeople(data?.people ?? []);
     } finally {

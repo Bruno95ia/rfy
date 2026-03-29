@@ -210,8 +210,9 @@ export function ConhecimentoClient() {
             Enviar documento
           </CardTitle>
           <p className="text-sm text-[var(--color-text-muted)]">
-            Até 50 MB. Texto, Markdown, CSV, PDF (texto), DOCX e Excel (XLS/XLSX) têm o conteúdo extraído para o diagnóstico;
-            PDF digitalizado ou formatos não suportados aparecem só como referência.
+            Até 50 MB. Texto, Markdown, CSV, PDF (texto), Word (.doc, .docx, .docm), RTF, ODT e Excel (XLS/XLSX) têm o
+            conteúdo extraído para o cálculo do diagnóstico (incluindo cópias de importação SUPHO no repositório). PDF
+            digitalizado ou formatos não suportados aparecem só como referência.
           </p>
         </CardHeader>
         <CardContent>
@@ -229,6 +230,7 @@ export function ConhecimentoClient() {
                 key={fileInputKey}
                 name="file"
                 type="file"
+                accept=".pdf,.doc,.docx,.docm,.rtf,.odt,.txt,.md,.csv,.xls,.xlsx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/rtf,application/vnd.oasis.opendocument.text"
                 disabled={!canEdit || uploading}
                 className="w-full min-w-0 max-w-full cursor-pointer rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm file:mr-3 file:cursor-pointer file:rounded-md file:border-0 file:bg-indigo-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-indigo-700 disabled:opacity-60 dark:file:bg-indigo-950/50 dark:file:text-indigo-200"
               />

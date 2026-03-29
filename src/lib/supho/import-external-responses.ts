@@ -139,6 +139,21 @@ function columnLikertRatio(dataRows: string[][], colIdx: number): number {
  * Colunas de metadados do Google Forms / Luma (antes das perguntas).
  * Evitar `includes('nome')` solto — confunde perguntas tipo "Qual o nome da empresa?".
  */
+/**
+ * Perguntas abertas (Google Forms: parágrafo / texto) — não mapear para Likert 1–5.
+ */
+function isLikelyOpenTextQuestionHeader(header: string): boolean {
+  const nh = normHeader(header);
+  if (!nh) return false;
+  if (nh.includes('em_1_frase') || nh.includes('uma_frase')) return true;
+  if (nh.includes('descreva') || nh.includes('descrever') || nh.includes('comente') || nh.includes('expliqu'))
+    return true;
+  if (nh.includes('paragrafo') || nh.includes('texto_longo') || nh.includes('resposta_aberta') || nh.includes('longa_resposta'))
+    return true;
+  if (nh.includes('paragraph') || nh.includes('open_ended') || nh.includes('essay')) return true;
+  return false;
+}
+
 function isLikelyMetaHeader(header: string): boolean {
   const nh = normHeader(header);
   if (!nh) return false;
@@ -174,6 +189,40 @@ function isLikelyMetaHeader(header: string): boolean {
   if (nh.includes('link') && (nh.includes('editar') || nh.includes('edit'))) return true;
 
   return false;
+}
+
+const LIKERT_COL_MIN_RATIO = 0.32;
+
+/**
+ * Colunas que parecem escala 1–5 (export Google Forms pode misturar texto aberto com Likert).
+ * Só estas são alinhadas à ordem das perguntas da campanha.
+ */
+function listLikertScaleColumnIndices(headers: string[], dataRows: string[][]): number[] {
+  const w = headers.length;
+  const out: number[] = [];
+  for (let c = 0; c < w; c++) {
+    const h = headers[c] ?? '';
+    if (isLikelyMetaHeader(h)) continue;
+    if (isLikelyOpenTextQuestionHeader(h)) continue;
+    if (columnLikertRatio(dataRows, c) >= LIKERT_COL_MIN_RATIO) out.push(c);
+  }
+  return out.sort((a, b) => a - b);
+}
+
+/**
+ * Se não houver colunas com ratio alto (poucas linhas), usa o primeiro bloco “tipo pergunta”
+ * mas exclui cabeçalhos de texto aberto e colunas com poucas notas válidas.
+ */
+function fallbackLikertColumnIndices(headers: string[], dataRows: string[][]): number[] {
+  const firstQ = findFirstQuestionColumnIndex(headers, dataRows);
+  if (firstQ < 0) return [];
+  const out: number[] = [];
+  for (let c = firstQ; c < headers.length; c++) {
+    const h = headers[c] ?? '';
+    if (isLikelyOpenTextQuestionHeader(h)) continue;
+    if (columnLikertRatio(dataRows, c) >= 0.18) out.push(c);
+  }
+  return out;
 }
 
 /** Remove colunas vazias à direita (Excel costuma alargar a grelha). */
@@ -226,6 +275,8 @@ export function shouldPreferWideFormat(rows: string[][]): boolean {
   const headers = data[0]!.map((h) => String(h ?? '').trim());
   if (hasExplicitQuestionIdColumn(headers)) return false;
   const dataRows = data.slice(1);
+  if (listLikertScaleColumnIndices(headers, dataRows).length > 0) return true;
+  if (fallbackLikertColumnIndices(headers, dataRows).length > 0) return true;
   const firstQ = findFirstQuestionColumnIndex(headers, dataRows);
   return firstQ >= 0 && headers.length > firstQ;
 }
@@ -331,8 +382,12 @@ export function parseWideFormatMatrix(
   const headers = trimmed[0]!;
   const dataRows = trimmed.slice(1);
 
-  const firstQ = findFirstQuestionColumnIndex(headers, dataRows);
-  if (firstQ < 0) {
+  /** Colunas com notas 1–5 (ignora perguntas abertas tipo Google Forms no meio da grelha). */
+  let likertCols = listLikertScaleColumnIndices(headers, dataRows);
+  if (likertCols.length === 0) {
+    likertCols = fallbackLikertColumnIndices(headers, dataRows);
+  }
+  if (likertCols.length === 0) {
     return {
       groups: [],
       errors: [
@@ -341,11 +396,11 @@ export function parseWideFormatMatrix(
     };
   }
 
-  const qCountFile = headers.length - firstQ;
   const nCampaign = questionIdsOrdered.length;
   /** Mais colunas no ficheiro que na campanha: ignora as extra. Menos: importa só as que existem (parcial). */
-  const useCount = Math.min(qCountFile, nCampaign);
+  const useCount = Math.min(likertCols.length, nCampaign);
   const idsSlice = questionIdsOrdered.slice(0, useCount);
+  const metaEnd = likertCols[0]!;
 
   if (useCount === 0) {
     return { groups: [], errors: ['Nenhuma coluna de pergunta após os metadados'] };
@@ -355,15 +410,15 @@ export function parseWideFormatMatrix(
   for (let r = 0; r < dataRows.length; r++) {
     const row = dataRows[r]!;
     const line = r + 2;
-    let respondent = respondentFromWideMeta(row, headers, 0, firstQ);
-    const ext = externalIdFromWideMeta(row, headers, 0, firstQ);
+    let respondent = respondentFromWideMeta(row, headers, 0, metaEnd);
+    const ext = externalIdFromWideMeta(row, headers, 0, metaEnd);
     if (!respondent) {
       respondent = ext.trim() ? ext : `Respondente (linha ${line})`;
     }
     const answers: SuphoImportAnswer[] = [];
     let rowOk = true;
     for (let i = 0; i < useCount; i++) {
-      const col = firstQ + i;
+      const col = likertCols[i]!;
       const rawCell = row[col];
       const likert = parseLikertCell(rawCell);
       if (likert === null) {

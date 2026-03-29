@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: 'standalone',
-  serverExternalPackages: ['pdf-parse', 'mammoth', 'xlsx'],
+  serverExternalPackages: ['pdf-parse', 'mammoth', 'xlsx', 'word-extractor', 'jszip'],
   /** Uploads multipart (pipeline, SUPHO, demo pack) — default do Next é ~10MB e cortava ficheiros maiores antes da rota. */
   experimental: {
     proxyClientMaxBodySize: '60mb',

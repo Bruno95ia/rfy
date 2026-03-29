@@ -37,7 +37,9 @@ export function SuphoFormClient({ slug }: SuphoFormClientProps) {
       setError(null);
       try {
         const params = new URLSearchParams({ token, slug });
-        const res = await fetch(`/api/forms/supho/info?${params.toString()}`);
+        const res = await fetch(`/api/forms/supho/info?${params.toString()}`, {
+          cache: 'no-store',
+        });
         const data = await res.json();
         if (!res.ok) {
           throw new Error(data?.error || 'Erro ao carregar formulário');
@@ -79,6 +81,7 @@ export function SuphoFormClient({ slug }: SuphoFormClientProps) {
     try {
       const res = await fetch('/api/forms/supho/respond', {
         method: 'POST',
+        cache: 'no-store',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           token,

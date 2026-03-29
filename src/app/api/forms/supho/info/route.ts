@@ -1,13 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 
+/** Evita cache de CDN/browser com perguntas desatualizadas após alterações na campanha. */
+function json(data: unknown, init?: ResponseInit) {
+  const h = new Headers(init?.headers);
+  if (!h.has('Cache-Control')) h.set('Cache-Control', 'private, no-store, must-revalidate');
+  return NextResponse.json(data, { ...init, headers: h });
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const token = searchParams.get('token')?.trim();
   const slug = searchParams.get('slug')?.trim();
 
   if (!token || !slug) {
-    return NextResponse.json({ error: 'token e slug são obrigatórios' }, { status: 400 });
+    return json({ error: 'token e slug são obrigatórios' }, { status: 400 });
   }
 
   const admin = createAdminClient();
@@ -20,20 +27,20 @@ export async function GET(req: NextRequest) {
     .single();
 
   if (inviteError || !invite) {
-    return NextResponse.json({ error: 'Convite não encontrado ou inválido' }, { status: 404 });
+    return json({ error: 'Convite não encontrado ou inválido' }, { status: 404 });
   }
   if (invite.status === 'answered') {
-    return NextResponse.json({ error: 'Este link já foi utilizado' }, { status: 400 });
+    return json({ error: 'Este link já foi utilizado' }, { status: 400 });
   }
   if (!['pending', 'sent'].includes(invite.status)) {
-    return NextResponse.json({ error: 'Convite não está mais disponível' }, { status: 400 });
+    return json({ error: 'Convite não está mais disponível' }, { status: 400 });
   }
 
   const campaignId = slug.startsWith('supho-')
     ? slug.slice('supho-'.length).trim()
     : '';
   if (!campaignId) {
-    return NextResponse.json({ error: 'Formulário SUPHO inválido' }, { status: 400 });
+    return json({ error: 'Formulário SUPHO inválido' }, { status: 400 });
   }
 
   const { data: campaign, error: campaignError } = await admin
@@ -43,7 +50,7 @@ export async function GET(req: NextRequest) {
     .single();
 
   if (campaignError || !campaign) {
-    return NextResponse.json({ error: 'Campanha não encontrada para este formulário' }, { status: 404 });
+    return json({ error: 'Campanha não encontrada para este formulário' }, { status: 404 });
   }
 
   type QuestionRow = {
@@ -90,10 +97,10 @@ export async function GET(req: NextRequest) {
   }
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({
+  return json({
     formName: invite.form_slug,
     respondentName: invite.name,
     questions: data ?? [],

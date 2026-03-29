@@ -139,6 +139,34 @@ describe('parseWideFormatMatrix (Google Forms / Luma)', () => {
       { question_id: q2, value: 5 },
     ]);
   });
+
+  it('ignora coluna de texto aberto (ex.: "Em 1 frase…") e alinha só as Likert à campanha', () => {
+    const matrix = [
+      [
+        'Carimbo de data/hora',
+        'Endereço de e-mail',
+        'Nome',
+        'Em 1 frase: qual é o produto principal da Foodtest hoje?',
+        'Pergunta escala A',
+        'Pergunta escala B',
+      ],
+      [
+        '28/03/2025 10:00',
+        'a@b.com',
+        'Teste',
+        'Pesquisas sensoriais - consultoria',
+        '4',
+        '5',
+      ],
+    ];
+    const { groups, errors } = parseWideFormatMatrix(matrix, [q1, q2]);
+    expect(errors).toEqual([]);
+    expect(groups).toHaveLength(1);
+    expect(groups[0]!.answers).toEqual([
+      { question_id: q1, value: 4 },
+      { question_id: q2, value: 5 },
+    ]);
+  });
 });
 
 describe('parseSuphoImportFromBuffer (.xlsx real)', () => {

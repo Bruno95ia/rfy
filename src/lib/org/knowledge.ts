@@ -21,10 +21,6 @@ export type OrgKnowledgeFileRow = {
   label: string | null;
 };
 
-function includeInDiagnosticContext(row: OrgKnowledgeFileRow): boolean {
-  return row.label !== KNOWLEDGE_LABEL_SUPHO_IMPORT;
-}
-
 function safeFileSegment(name: string): string {
   const base = name.replace(/[/\\]/g, '_').replace(/[^a-zA-Z0-9._\s-]/g, '_');
   return base.slice(0, 200) || 'file';
@@ -47,7 +43,7 @@ function truncateDiagnosticExcerpt(text: string): string {
   return `${trimmed.slice(0, MAX_EXCERPT_PER_FILE)}\n\n[… truncado para o diagnóstico.]`;
 }
 
-/** Lê trecho textual para inclusão no bundle; PDF/DOCX/Excel extraem texto; outros binários viram aviso. */
+/** Lê trecho textual para inclusão no bundle; PDF, Word (DOC/DOCX), RTF, ODT, Excel extraem texto; outros binários viram aviso. */
 export async function excerptForKnowledgeFile(
   storagePath: string,
   filename: string,
@@ -72,7 +68,7 @@ export async function excerptForKnowledgeFile(
     }
 
     const sz = sizeBytes != null ? `${Math.round(sizeBytes / 1024)} KB` : 'tamanho desconhecido';
-    return `[Não foi possível extrair texto legível (${mimeType ?? 'tipo desconhecido'}, ~${sz}). PDF digitalizado/imagem, protegido ou formato não suportado — use texto ou exporte para PDF com camada de texto.]`;
+    return `[Não foi possível extrair texto legível (${mimeType ?? 'tipo desconhecido'}, ~${sz}). PDF digitalizado/imagem, protegido ou formato não suportado — use texto, Word (.doc/.docx), RTF, ODT ou exporte para PDF com camada de texto.]`;
   } catch {
     return '[Não foi possível ler o arquivo.]';
   }
@@ -124,14 +120,13 @@ export async function appendKnowledgeFilesToBundle(
   baseBundle: string
 ): Promise<{ bundle: string; knowledgeFilesUsed: KnowledgeFileUsedInDiagnostic[] }> {
   const files = await fetchKnowledgeFilesForCampaign(admin, orgId, campaignId);
-  const forDiagnostic = files.filter(includeInDiagnosticContext);
-  if (forDiagnostic.length === 0) {
+  if (files.length === 0) {
     return { bundle: baseBundle, knowledgeFilesUsed: [] };
   }
 
   const knowledgeFilesUsed: KnowledgeFileUsedInDiagnostic[] = [];
   const parts: string[] = [];
-  for (const f of forDiagnostic) {
+  for (const f of files) {
     const scope = f.campaign_id ? ('campanha' as const) : ('organização' as const);
     knowledgeFilesUsed.push({ id: f.id, filename: f.filename, scope });
     const excerpt = await excerptForKnowledgeFile(f.storage_path, f.filename, f.mime_type, f.size_bytes);

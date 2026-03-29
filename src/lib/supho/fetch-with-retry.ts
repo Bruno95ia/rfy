@@ -16,7 +16,11 @@ export async function fetchJsonWithRetry<T>(
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      const res = await fetch(input, init);
+      const merged: RequestInit = {
+        ...init,
+        credentials: init?.credentials ?? 'include',
+      };
+      const res = await fetch(input, merged);
       const data = (await res.json().catch(() => ({}))) as T;
       if (!res.ok && res.status >= 500 && attempt < retries) {
         await delay(280 * (attempt + 1));

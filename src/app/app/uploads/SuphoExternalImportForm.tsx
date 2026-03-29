@@ -48,7 +48,9 @@ export function SuphoExternalImportForm({ orgId }: Props) {
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const input = (e.currentTarget.elements.namedItem('file') as HTMLInputElement | null)?.files?.[0];
+    // Guardar referências antes de qualquer await — após await, currentTarget do evento sintético pode ser null.
+    const fileInput = e.currentTarget.elements.namedItem('file') as HTMLInputElement | null;
+    const input = fileInput?.files?.[0];
     if (!input) {
       toast({ title: 'Selecione um arquivo', variant: 'destructive' });
       return;
@@ -87,7 +89,7 @@ export function SuphoExternalImportForm({ orgId }: Props) {
         }`,
         variant: 'success',
       });
-      (e.currentTarget.elements.namedItem('file') as HTMLInputElement).value = '';
+      if (fileInput) fileInput.value = '';
       refreshLimits();
       router.refresh();
     } catch (err) {
@@ -180,10 +182,10 @@ export function SuphoExternalImportForm({ orgId }: Props) {
           className="block w-full text-sm text-slate-600 file:mr-4 file:rounded-lg file:border-0 file:bg-indigo-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-indigo-700 hover:file:bg-indigo-100 disabled:opacity-50"
         />
         <p className="mt-3 text-xs text-slate-500">
-          Google Forms: a ordem das colunas de pergunta deve ser a mesma da campanha RFY (primeira coluna de
-          pergunta = primeira pergunta na campanha). Aceita notas 1–5, 4,0 e texto tipo &quot;3 - Concordo&quot;.
-          Metadados (carimbo, e-mail, nome) são ignorados. Colunas a mais são ignoradas; células vazias são
-          ignoradas. Ordem das perguntas:{' '}
+          Google Forms: só importamos colunas de escala 1–5; perguntas abertas (parágrafo, &quot;Em 1 frase…&quot;)
+          são ignoradas na contagem. A ordem das colunas Likert deve seguir a campanha RFY. Aceita notas 1–5, 4,0 e
+          texto tipo &quot;3 - Concordo&quot;. Metadados (carimbo, e-mail, nome) são ignorados. Colunas Likert a mais
+          são ignoradas; células vazias são ignoradas. Ordem das perguntas:{' '}
           <a href="/api/supho/questions" className="text-indigo-600 hover:underline" target="_blank" rel="noreferrer">
             /api/supho/questions
           </a>

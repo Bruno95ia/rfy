@@ -141,8 +141,26 @@ export async function POST(req: NextRequest) {
     const nivelAdjusted = computeNivel(itsmoAdjusted);
     const gapsAdjusted = computeGaps(result.ic, result.ih, ipAdjusted);
 
+    const { data: campaignSynthRow } = await admin
+      .from('supho_diagnostic_campaigns')
+      .select('uploads_context_markdown')
+      .eq('id', campaignId)
+      .maybeSingle();
+    const uploadsSynth =
+      campaignSynthRow &&
+      typeof campaignSynthRow === 'object' &&
+      'uploads_context_markdown' in campaignSynthRow
+        ? String(
+            (campaignSynthRow as { uploads_context_markdown?: string | null }).uploads_context_markdown ?? ''
+          ).trim()
+        : '';
+
     const ctxForBundle = (ctxRows ?? []) as Array<{ doc_key: string; body_markdown: string | null }>;
     let bundle = buildOrgContextBundleText(ctxForBundle);
+    if (uploadsSynth) {
+      const block = `## Síntese dos uploads (campanha)\n\n${uploadsSynth}`;
+      bundle = bundle.trim() ? `${bundle}\n\n---\n\n${block}` : block;
+    }
     const { bundle: bundleWithKnowledge, knowledgeFilesUsed } = await appendKnowledgeFilesToBundle(
       admin,
       orgId,
@@ -173,6 +191,7 @@ export async function POST(req: NextRequest) {
       orgContextPresent: bundle.trim().length > 0,
       orgContextSummary: orgContextSummary || null,
       knowledgeFilesUsed,
+      uploadsSynthesisUsed: Boolean(uploadsSynth),
     };
 
     const { error: insertError } = await admin.from('supho_diagnostic_results').insert({

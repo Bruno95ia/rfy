@@ -11,22 +11,36 @@ export type CurrentCampaignForMaturity = {
   uploads_context_updated_at: string | null;
 };
 
+/** Normaliza timestamptz vindo do driver (string, Date ou número). */
+export function coerceIsoTimestamp(value: unknown): string | null {
+  if (value == null) return null;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value.toISOString();
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? null : d.toISOString();
+  }
+  return String(value);
+}
+
 function rowFrom(data: unknown): CurrentCampaignForMaturity | null {
   if (!data || typeof data !== 'object') return null;
   const o = data as Record<string, unknown>;
   const id = o.id;
   const name = o.name;
   const status = o.status;
-  const updated_at = o.updated_at;
+  const updated_at = coerceIsoTimestamp(o.updated_at);
   if (typeof id !== 'string' || typeof name !== 'string' || typeof status !== 'string') return null;
-  if (typeof updated_at !== 'string') return null;
-  const uploads = o.uploads_context_updated_at;
+  if (!updated_at) return null;
+  const uploadsRaw = o.uploads_context_updated_at;
+  const uploads =
+    uploadsRaw == null ? null : coerceIsoTimestamp(uploadsRaw) ?? String(uploadsRaw);
   return {
     id,
     name,
     status,
     updated_at,
-    uploads_context_updated_at: typeof uploads === 'string' ? uploads : uploads == null ? null : String(uploads),
+    uploads_context_updated_at: uploads,
   };
 }
 

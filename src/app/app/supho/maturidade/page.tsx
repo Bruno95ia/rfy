@@ -22,20 +22,40 @@ export default async function MaturidadePage() {
     );
   }
 
-  const currentCampaign = await fetchCurrentCampaignForMaturity(supabase, orgId);
+  const { data: latestResult } = await supabase
+    .from('supho_diagnostic_results')
+    .select(
+      'id, campaign_id, computed_at, ic, ih, ip, itsmo, nivel, gap_c_h, gap_c_p, ise, ipt, icl, sample_size, result_json'
+    )
+    .eq('org_id', orgId)
+    .order('computed_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
-  const { data: latestResult } = currentCampaign
-    ? await supabase
-        .from('supho_diagnostic_results')
-        .select(
-          'id, campaign_id, computed_at, ic, ih, ip, itsmo, nivel, gap_c_h, gap_c_p, ise, ipt, icl, sample_size, result_json'
-        )
-        .eq('org_id', orgId)
-        .eq('campaign_id', currentCampaign.id)
-        .order('computed_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-    : { data: null };
+  type CampaignRow = { id: string; name: string; uploads_context_updated_at: string | null };
+  let campaignRowForResult: CampaignRow | null = null;
+
+  if (latestResult?.campaign_id) {
+    const { data: campaignData } = await supabase
+      .from('supho_diagnostic_campaigns')
+      .select('id, name, uploads_context_updated_at')
+      .eq('org_id', orgId)
+      .eq('id', latestResult.campaign_id)
+      .maybeSingle();
+    if (campaignData && typeof campaignData === 'object' && campaignData !== null && 'id' in campaignData) {
+      const cd = campaignData as Record<string, unknown>;
+      campaignRowForResult = {
+        id: String(cd.id),
+        name: typeof cd.name === 'string' ? cd.name : '',
+        uploads_context_updated_at:
+          cd.uploads_context_updated_at == null
+            ? null
+            : typeof cd.uploads_context_updated_at === 'string'
+              ? cd.uploads_context_updated_at
+              : String(cd.uploads_context_updated_at),
+      };
+    }
+  }
 
   const result = latestResult
     ? {
@@ -99,21 +119,58 @@ export default async function MaturidadePage() {
     : null;
 
   const computedAtIso = result ? toIsoString(latestResult?.computed_at) : '';
-  const campaignContext = currentCampaign
-    ? {
-        campaignId: currentCampaign.id,
-        campaignName: currentCampaign.name,
-        uploadsContextUpdatedAt: currentCampaign.uploads_context_updated_at,
-        uploadsStale:
-          Boolean(result) &&
-          isUploadsContextNewerThanCompute(currentCampaign.uploads_context_updated_at, computedAtIso),
-        hasUploadsContext: Boolean(currentCampaign.uploads_context_updated_at),
-      }
-    : null;
 
-  const pageSubtitle = currentCampaign
-    ? `Painel alinhado à campanha atual ${currentCampaign.name}. Os índices e o texto contextual referem-se ao último cálculo desta campanha (respostas, documentos de contexto e síntese de uploads quando aplicável).`
-    : 'Crie uma campanha em Diagnóstico para medir maturidade. Quando houver campanha, o painel segue a mais recentemente atualizada (inclui alterações em uploads e síntese).';
+  let newerCampaignWithoutResult: { campaignId: string; campaignName: string } | null = null;
+  if (latestResult?.campaign_id) {
+    const recentByUpdated = await fetchCurrentCampaignForMaturity(supabase, orgId);
+    if (recentByUpdated && recentByUpdated.id !== latestResult.campaign_id) {
+      const { data: anyResultForRecent } = await supabase
+        .from('supho_diagnostic_results')
+        .select('id')
+        .eq('org_id', orgId)
+        .eq('campaign_id', recentByUpdated.id)
+        .limit(1)
+        .maybeSingle();
+      if (!anyResultForRecent) {
+        newerCampaignWithoutResult = {
+          campaignId: recentByUpdated.id,
+          campaignName: recentByUpdated.name,
+        };
+      }
+    }
+  }
+
+  const emptyStateCampaign = !latestResult ? await fetchCurrentCampaignForMaturity(supabase, orgId) : null;
+
+  const campaignContext =
+    result && latestResult
+      ? {
+          campaignId: campaignRowForResult?.id ?? latestResult.campaign_id,
+          campaignName: campaignRowForResult?.name?.trim() ? campaignRowForResult.name : 'Campanha',
+          uploadsContextUpdatedAt: campaignRowForResult?.uploads_context_updated_at ?? null,
+          uploadsStale: isUploadsContextNewerThanCompute(
+            campaignRowForResult?.uploads_context_updated_at ?? null,
+            computedAtIso
+          ),
+          hasUploadsContext: Boolean(campaignRowForResult?.uploads_context_updated_at),
+          newerCampaignWithoutResult,
+        }
+      : emptyStateCampaign
+        ? {
+            campaignId: emptyStateCampaign.id,
+            campaignName: emptyStateCampaign.name,
+            uploadsContextUpdatedAt: emptyStateCampaign.uploads_context_updated_at,
+            uploadsStale: false,
+            hasUploadsContext: Boolean(emptyStateCampaign.uploads_context_updated_at),
+            newerCampaignWithoutResult: null,
+          }
+        : null;
+
+  const pageSubtitle = latestResult
+    ? `Último diagnóstico calculado na organização${
+        campaignRowForResult?.name ? ` (campanha ${campaignRowForResult.name})` : ''
+      }. Índices e texto contextual referem-se a esse cálculo.`
+    : 'Crie uma campanha em Diagnóstico para medir maturidade. Sem resultados calculados, o painel sugere a campanha mais recentemente atualizada para começar.';
 
   return (
     <div className="space-y-6">

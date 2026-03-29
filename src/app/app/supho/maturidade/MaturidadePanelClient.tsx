@@ -80,6 +80,8 @@ export type MaturidadeCampaignContext = {
   uploadsContextUpdatedAt: string | null;
   uploadsStale: boolean;
   hasUploadsContext: boolean;
+  /** Campanha mais recente por atividade sem diagnóstico calculado (painel mostra último cálculo de outra campanha) */
+  newerCampaignWithoutResult?: { campaignId: string; campaignName: string } | null;
 };
 
 interface MaturidadePanelClientProps {
@@ -199,11 +201,32 @@ export function MaturidadePanelClient({
   const perfil = getPerfilPredominante(result.ic, result.ih, result.ip);
   const perfilText = getExecutiveTextPerfil(perfil);
 
-  const campaignLabel =
-    campaignContext && campaignContext.campaignId === result.campaignId ? campaignContext.campaignName : null;
+  const campaignLabel = campaignContext?.campaignName ?? null;
 
   return (
     <div className="space-y-6">
+      {campaignContext?.newerCampaignWithoutResult && (
+        <div
+          className="flex gap-3 rounded-lg border border-sky-200 bg-sky-50 p-4 text-sm text-sky-950 dark:border-sky-900/50 dark:bg-sky-950/35 dark:text-sky-100"
+          role="status"
+        >
+          <AlertTriangle className="h-5 w-5 shrink-0 text-sky-600 dark:text-sky-400" aria-hidden />
+          <div>
+            <p className="font-medium">Campanha mais recente ainda sem diagnóstico</p>
+            <p className="mt-1 text-sky-900/90 dark:text-sky-100/90">
+              O painel mostra o último cálculo da organização (ver campanha abaixo). A campanha{' '}
+              <span className="font-medium">{campaignContext.newerCampaignWithoutResult.campaignName}</span> foi
+              atualizada mais recentemente e ainda não tem resultado calculado.
+            </p>
+            <Link
+              href={`/app/supho/diagnostico?campaign=${encodeURIComponent(campaignContext.newerCampaignWithoutResult.campaignId)}`}
+              className="mt-2 inline-block text-sm font-medium text-sky-800 underline hover:no-underline dark:text-sky-300"
+            >
+              Abrir diagnóstico dessa campanha
+            </Link>
+          </div>
+        </div>
+      )}
       {campaignContext?.uploadsStale && (
         <div
           className="flex gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-100"

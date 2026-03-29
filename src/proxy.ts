@@ -14,6 +14,14 @@ function hasSessionCookie(request: NextRequest): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 }
 
+const NO_HTML_CACHE =
+  'private, no-cache, no-store, must-revalidate, max-age=0';
+
+function withNoHtmlCache(res: NextResponse): NextResponse {
+  res.headers.set('Cache-Control', NO_HTML_CACHE);
+  return res;
+}
+
 export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
   const requestId = request.headers.get(REQUEST_ID_HEADER) ?? generateRequestId();
@@ -21,6 +29,7 @@ export async function proxy(request: NextRequest) {
     request: { headers: request.headers },
   });
   response.headers.set(REQUEST_ID_HEADER, requestId);
+  withNoHtmlCache(response);
 
   // Sem Supabase: proteção por cookie de sessão (validação real em getCurrentUser nas rotas).
   const hasSession = hasSessionCookie(request);
@@ -29,15 +38,19 @@ export async function proxy(request: NextRequest) {
   const isAuth = path === '/login' || path === '/signup';
 
   if (isApp && !hasSession) {
-    return NextResponse.redirect(new URL('/login', request.url));
+    return withNoHtmlCache(NextResponse.redirect(new URL('/login', request.url)));
   }
   if (isAuth && hasSession) {
-    return NextResponse.redirect(new URL('/app/dashboard', request.url));
+    return withNoHtmlCache(NextResponse.redirect(new URL('/app/dashboard', request.url)));
   }
 
   return response;
 }
 
+/**
+ * Exclui `/_next/static` e `/_next/image` — esses ficam com cache longo (hash por build).
+ * Resto (HTML, API, etc.) com no-store para evitar ChunkLoadError após deploy.
+ */
 export const config = {
-  matcher: ['/', '/app/:path*', '/login', '/signup', '/setup', '/api/:path*'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
 };

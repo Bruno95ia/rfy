@@ -2,8 +2,10 @@ import { requireAuth, getOrgIdForUser } from '@/lib/auth';
 import { toIsoString, toPlainSerializable } from '@/lib/serialize-props';
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/layout/PageHeader';
-import Link from 'next/link';
-import { Button } from '@/components/ui/button';
+import {
+  fetchCurrentCampaignForMaturity,
+  isUploadsContextNewerThanCompute,
+} from '@/lib/supho/maturidade-campaign';
 import { MaturidadePanelClient } from './MaturidadePanelClient';
 import { HistoricoDiagnosticoClient } from './HistoricoDiagnosticoClient';
 
@@ -20,15 +22,20 @@ export default async function MaturidadePage() {
     );
   }
 
-  const { data: latestResult } = await supabase
-    .from('supho_diagnostic_results')
-    .select(
-      'id, campaign_id, computed_at, ic, ih, ip, itsmo, nivel, gap_c_h, gap_c_p, ise, ipt, icl, sample_size, result_json'
-    )
-    .eq('org_id', orgId)
-    .order('computed_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const currentCampaign = await fetchCurrentCampaignForMaturity(supabase, orgId);
+
+  const { data: latestResult } = currentCampaign
+    ? await supabase
+        .from('supho_diagnostic_results')
+        .select(
+          'id, campaign_id, computed_at, ic, ih, ip, itsmo, nivel, gap_c_h, gap_c_p, ise, ipt, icl, sample_size, result_json'
+        )
+        .eq('org_id', orgId)
+        .eq('campaign_id', currentCampaign.id)
+        .order('computed_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+    : { data: null };
 
   const result = latestResult
     ? {
@@ -75,6 +82,7 @@ export default async function MaturidadePage() {
         orgContextPresent: Boolean(rj?.orgContextPresent),
         orgContextSummary:
           typeof rj?.orgContextSummary === 'string' ? rj.orgContextSummary : null,
+        uploadsSynthesisUsed: rj?.uploadsSynthesisUsed === true,
         indicesFromSurvey:
           rj?.indicesFromSurvey && typeof rj.indicesFromSurvey === 'object' && rj.indicesFromSurvey !== null
             ? {
@@ -90,6 +98,23 @@ export default async function MaturidadePage() {
       }
     : null;
 
+  const computedAtIso = result ? toIsoString(latestResult?.computed_at) : '';
+  const campaignContext = currentCampaign
+    ? {
+        campaignId: currentCampaign.id,
+        campaignName: currentCampaign.name,
+        uploadsContextUpdatedAt: currentCampaign.uploads_context_updated_at,
+        uploadsStale:
+          Boolean(result) &&
+          isUploadsContextNewerThanCompute(currentCampaign.uploads_context_updated_at, computedAtIso),
+        hasUploadsContext: Boolean(currentCampaign.uploads_context_updated_at),
+      }
+    : null;
+
+  const pageSubtitle = currentCampaign
+    ? `Painel alinhado à campanha atual ${currentCampaign.name}. Os índices e o texto contextual referem-se ao último cálculo desta campanha (respostas, documentos de contexto e síntese de uploads quando aplicável).`
+    : 'Crie uma campanha em Diagnóstico para medir maturidade. Quando houver campanha, o painel segue a mais recentemente atualizada (inclui alterações em uploads e síntese).';
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -99,11 +124,12 @@ export default async function MaturidadePage() {
           { label: 'Painel de Maturidade' },
         ]}
         title="Painel de Maturidade SUPHO"
-        subtitle="Visão integrada do último diagnóstico: radar dos pilares, nível de maturidade (ITSMO), gaps e leitura executiva."
+        subtitle={pageSubtitle}
       />
       <MaturidadePanelClient
         result={toPlainSerializable(result)}
         enrichment={toPlainSerializable(enrichment)}
+        campaignContext={toPlainSerializable(campaignContext)}
       />
       <HistoricoDiagnosticoClient />
     </div>

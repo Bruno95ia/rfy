@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { trackScreen } from '@/lib/analytics/track';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -40,6 +40,7 @@ interface DiagnosticoClientProps {
 export function DiagnosticoClient({ orgId, initialCampaigns }: DiagnosticoClientProps) {
   const { toast } = useToast();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [campaigns, setCampaigns] = useState<Campaign[]>(initialCampaigns);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
@@ -63,6 +64,14 @@ export function DiagnosticoClient({ orgId, initialCampaigns }: DiagnosticoClient
   useEffect(() => {
     setCampaigns(initialCampaigns);
   }, [initialCampaigns]);
+
+  useEffect(() => {
+    const cid = searchParams.get('campaign');
+    if (!cid || campaigns.length === 0) return;
+    if (campaigns.some((c) => c.id === cid)) {
+      setSelectedCampaignId(cid);
+    }
+  }, [searchParams, campaigns]);
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const parseInviteLines = (text: string): { valid: { email: string; name: string }[]; invalid: string[] } => {

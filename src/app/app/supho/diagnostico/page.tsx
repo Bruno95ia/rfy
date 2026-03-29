@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { requireAuth, getOrgIdForUser } from '@/lib/auth';
 import { toPlainSerializable } from '@/lib/serialize-props';
 import { createClient } from '@/lib/supabase/server';
@@ -34,18 +35,26 @@ export default async function DiagnosticoPage() {
         title="Diagnóstico SUPHO"
         subtitle="Campanhas de pesquisa por pilares (Cultura, Humano, Performance), respondentes e cálculo dos índices IC, IH, IP e ITSMO."
       />
-      <DiagnosticoClient
-        orgId={orgId}
-        initialCampaigns={toPlainSerializable(
-          (campaigns ?? []) as Array<{
-            id: string;
-            name: string;
-            status: string;
-            created_at: string;
-            question_ids?: string[] | null;
-          }>
-        )}
-      />
+      <Suspense
+        fallback={
+          <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] py-12 text-center text-sm text-[var(--color-text-muted)]">
+            Carregando diagnóstico…
+          </div>
+        }
+      >
+        <DiagnosticoClient
+          orgId={orgId}
+          initialCampaigns={toPlainSerializable(
+            (campaigns ?? []) as Array<{
+              id: string;
+              name: string;
+              status: string;
+              created_at: string;
+              question_ids?: string[] | null;
+            }>
+          )}
+        />
+      </Suspense>
     </div>
   );
 }

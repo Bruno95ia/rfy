@@ -31,7 +31,7 @@ import {
   getOrgContextNarrative,
 } from '@/lib/supho/executive-text';
 import type { ErpIntegrationStatus, SystemsMaturityAssessment } from '@/lib/supho/systems-maturity';
-import { Gauge, FileText, ClipboardList, ArrowRight } from 'lucide-react';
+import { Gauge, FileText, ClipboardList, ArrowRight, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 
@@ -61,6 +61,8 @@ export type MaturidadeEnrichment = {
   } | null;
   orgContextPresent: boolean;
   orgContextSummary: string | null;
+  /** Síntese de ficheiros (Gemini ou fallback) incluída no bundle do último cálculo */
+  uploadsSynthesisUsed?: boolean;
   indicesFromSurvey: {
     ic: number;
     ih: number;
@@ -72,9 +74,18 @@ export type MaturidadeEnrichment = {
   } | null;
 } | null;
 
+export type MaturidadeCampaignContext = {
+  campaignId: string;
+  campaignName: string;
+  uploadsContextUpdatedAt: string | null;
+  uploadsStale: boolean;
+  hasUploadsContext: boolean;
+};
+
 interface MaturidadePanelClientProps {
   result: Result | null;
   enrichment?: MaturidadeEnrichment;
+  campaignContext?: MaturidadeCampaignContext | null;
 }
 
 function toSystemsAssessment(
@@ -91,12 +102,59 @@ function toSystemsAssessment(
   };
 }
 
-export function MaturidadePanelClient({ result, enrichment = null }: MaturidadePanelClientProps) {
+export function MaturidadePanelClient({
+  result,
+  enrichment = null,
+  campaignContext = null,
+}: MaturidadePanelClientProps) {
   useEffect(() => {
     trackScreen('supho_maturidade');
   }, []);
 
   if (!result) {
+    const diagnosticoHref = campaignContext
+      ? `/app/supho/diagnostico?campaign=${encodeURIComponent(campaignContext.campaignId)}`
+      : '/app/supho/diagnostico';
+
+    if (campaignContext) {
+      return (
+        <Card className="border-[var(--color-border)] bg-[var(--color-surface)] p-8 shadow-[var(--shadow-sm)] sm:p-12">
+          <CardContent className="flex flex-col items-center justify-center text-center">
+            <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-[var(--color-primary-soft)]">
+              <Gauge className="h-10 w-10 text-[var(--color-primary)]" />
+            </div>
+            <h2 className="mt-6 text-xl font-semibold text-[var(--color-text)]">
+              Campanha atual sem diagnóstico calculado
+            </h2>
+            <p className="mt-2 max-w-md text-sm leading-relaxed text-[var(--color-text-muted)]">
+              A campanha <span className="font-medium text-[var(--color-text)]">{campaignContext.campaignName}</span>{' '}
+              é a mais recente na organização. Calcule o diagnóstico nessa campanha para ver o ITSMO, o radar e o
+              contexto (incluindo síntese de uploads em Diagnóstico → Utilizar uploads, quando houver documentos).
+            </p>
+            {campaignContext.hasUploadsContext && (
+              <p className="mt-3 max-w-md text-xs text-[var(--color-text-muted)]">
+                Já existe síntese de ficheiros para esta campanha; ao calcular, o resultado incorporará esse texto no
+                bundle de contexto.
+              </p>
+            )}
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+              <Link href={diagnosticoHref}>
+                <Button size="sm" className="gap-1.5">
+                  <ClipboardList className="h-4 w-4" />
+                  Abrir diagnóstico desta campanha
+                </Button>
+              </Link>
+              <Link href="/app/supho/paip">
+                <Button size="sm" variant="outline" className="gap-1.5">
+                  Ver PAIP <ArrowRight className="h-3.5 w-3.5" />
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      );
+    }
+
     return (
       <Card className="border-[var(--color-border)] bg-[var(--color-surface)] p-8 shadow-[var(--shadow-sm)] sm:p-12">
         <CardContent className="flex flex-col items-center justify-center text-center">
@@ -104,13 +162,15 @@ export function MaturidadePanelClient({ result, enrichment = null }: MaturidadeP
             <Gauge className="h-10 w-10 text-[var(--color-primary)]" />
           </div>
           <h2 className="mt-6 text-xl font-semibold text-[var(--color-text)]">
-            Nenhum diagnóstico ainda
+            Nenhuma campanha ainda
           </h2>
           <p className="mt-2 max-w-md text-sm leading-relaxed text-[var(--color-text-muted)]">
-            Execute uma campanha de diagnóstico (pesquisas por bloco A/B/C) para calcular o ITSMO e exibir o Painel de Maturidade com radar, gaps e textos executivos.
+            Crie uma campanha de diagnóstico (pesquisas por bloco A/B/C), reúna respostas e calcule o ITSMO para ver o
+            painel com radar, gaps e textos executivos.
           </p>
           <p className="mt-4 text-xs text-[var(--color-text-muted)]">
-            Pilares: Cultura (IC) · Humano e Liderança (IH) · Comercial e Performance (IP). Fluxo: Diagnóstico → Maturidade → PAIP → Rituais → Certificação.
+            Pilares: Cultura (IC) · Humano e Liderança (IH) · Comercial e Performance (IP). Fluxo: Diagnóstico →
+            Maturidade → PAIP → Rituais → Certificação.
           </p>
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
             <Link href="/app/supho/diagnostico">
@@ -139,8 +199,33 @@ export function MaturidadePanelClient({ result, enrichment = null }: MaturidadeP
   const perfil = getPerfilPredominante(result.ic, result.ih, result.ip);
   const perfilText = getExecutiveTextPerfil(perfil);
 
+  const campaignLabel =
+    campaignContext && campaignContext.campaignId === result.campaignId ? campaignContext.campaignName : null;
+
   return (
     <div className="space-y-6">
+      {campaignContext?.uploadsStale && (
+        <div
+          className="flex gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-100"
+          role="status"
+        >
+          <AlertTriangle className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />
+          <div>
+            <p className="font-medium">Síntese de uploads mais recente que o último cálculo</p>
+            <p className="mt-1 text-amber-900/90 dark:text-amber-100/90">
+              Gere novamente a síntese em Diagnóstico (se necessário) e execute <strong>Calcular diagnóstico</strong>{' '}
+              para incorporar documentos e contexto atualizados ao painel.
+            </p>
+            <Link
+              href={`/app/supho/diagnostico?campaign=${encodeURIComponent(campaignContext.campaignId)}`}
+              className="mt-2 inline-block text-sm font-medium text-amber-800 underline hover:no-underline dark:text-amber-300"
+            >
+              Ir ao diagnóstico desta campanha
+            </Link>
+          </div>
+        </div>
+      )}
+
       {/* Nível e ITSMO */}
       <div className="flex flex-wrap items-center gap-4">
         <Badge variant="default" className="px-3 py-1 text-sm">
@@ -154,6 +239,11 @@ export function MaturidadePanelClient({ result, enrichment = null }: MaturidadeP
           {result.sampleSize > 0 && ` · n = ${result.sampleSize}`}
         </span>
       </div>
+      {campaignLabel && (
+        <p className="text-sm text-[var(--color-text-muted)]">
+          Campanha: <span className="font-medium text-[var(--color-text)]">{campaignLabel}</span>
+        </p>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Radar */}
@@ -229,6 +319,12 @@ export function MaturidadePanelClient({ result, enrichment = null }: MaturidadeP
             <p className="text-sm text-[var(--color-text-muted)]">
               Este resultado foi calculado antes da camada de CRM/ERP ou o registro não inclui metadados. Recalcule o
               diagnóstico na campanha SUPHO para incorporar integrações e o ajuste de IP.
+            </p>
+          )}
+          {enrichment?.uploadsSynthesisUsed && (
+            <p className="text-xs text-[var(--color-text-muted)]">
+              A síntese dos ficheiros de Conhecimento (Google Gemini quando configurado no servidor) entrou no contexto
+              deste cálculo.
             </p>
           )}
           <div>

@@ -31,9 +31,17 @@ import {
   getOrgContextNarrative,
 } from '@/lib/supho/executive-text';
 import type { ErpIntegrationStatus, SystemsMaturityAssessment } from '@/lib/supho/systems-maturity';
+import { computeITSMO } from '@/lib/supho/calculations';
 import { Gauge, FileText, ClipboardList, ArrowRight, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+
+/** Um único conjunto de números para radar, cartões e perfil (evita discrepâncias visuais por arredondamento). */
+function displayIndex(n: unknown): number {
+  const x = Number(n);
+  if (!Number.isFinite(x)) return 0;
+  return Math.round(x * 10) / 10;
+}
 
 type Result = {
   id: string;
@@ -192,13 +200,26 @@ export function MaturidadePanelClient({
     );
   }
 
+  const ic = displayIndex(result.ic);
+  const ih = displayIndex(result.ih);
+  const ip = displayIndex(result.ip);
+  const itsmo = displayIndex(result.itsmo);
+  const gapCH = displayIndex(result.gapCH);
+  const gapCP = displayIndex(result.gapCP);
+  const ise = Number.isFinite(result.ise) ? Math.round(result.ise * 100) / 100 : 0;
+  const ipt = Number.isFinite(result.ipt) ? Math.round(result.ipt * 100) / 100 : 0;
+  const icl = Number.isFinite(result.icl) ? Math.round(result.icl * 100) / 100 : 0;
+
+  const itsmoFromPillars = displayIndex(computeITSMO(ic, ih, ip));
+  const itsmoAligned = Math.abs(itsmoFromPillars - itsmo) < 0.15;
+
   const levelLabel = ITSMO_LEVEL_BANDS.find((b) => b.nivel === result.nivel)?.label ?? 'Reativo';
   const radarData = [
-    { subject: `${SUPHO_PILARES.A.nomeCurto} (IC)`, value: result.ic, fullMark: 100 },
-    { subject: `${SUPHO_PILARES.B.nomeCurto} (IH)`, value: result.ih, fullMark: 100 },
-    { subject: `${SUPHO_PILARES.C.nomeCurto} (IP)`, value: result.ip, fullMark: 100 },
+    { subject: `${SUPHO_PILARES.A.nomeCurto} (IC)`, value: ic, fullMark: 100 },
+    { subject: `${SUPHO_PILARES.B.nomeCurto} (IH)`, value: ih, fullMark: 100 },
+    { subject: `${SUPHO_PILARES.C.nomeCurto} (IP)`, value: ip, fullMark: 100 },
   ];
-  const perfil = getPerfilPredominante(result.ic, result.ih, result.ip);
+  const perfil = getPerfilPredominante(ic, ih, ip);
   const perfilText = getExecutiveTextPerfil(perfil);
 
   const campaignLabel = campaignContext?.campaignName ?? null;
@@ -255,7 +276,7 @@ export function MaturidadePanelClient({
           Nível {result.nivel} – {levelLabel}
         </Badge>
         <span className="text-2xl font-bold tabular-nums text-[var(--color-text)]">
-          ITSMO {result.itsmo.toFixed(1)}
+          ITSMO {itsmo.toFixed(1)}
         </span>
         <span className="text-sm text-[var(--color-text-muted)]">
           Atualizado em {new Date(result.computedAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
@@ -276,6 +297,10 @@ export function MaturidadePanelClient({
               <Gauge className="h-4 w-4 text-[var(--color-primary)]" />
               Radar IC / IH / IP
             </CardTitle>
+            <p className="px-6 pb-0 text-xs text-[var(--color-text-muted)]">
+              Escala 0–100 (mesmos valores dos indicadores abaixo). IC, IH e IP refletem o último cálculo guardado
+              (IP inclui ajuste de sistemas quando aplicável).
+            </p>
           </CardHeader>
           <CardContent>
             <div className="h-[280px] w-full">
@@ -283,9 +308,12 @@ export function MaturidadePanelClient({
                 <RadarChart data={radarData} margin={{ top: 20, right: 30, bottom: 20, left: 30 }}>
                   <PolarGrid stroke="#e2e8f0" />
                   <PolarAngleAxis dataKey="subject" tick={{ fontSize: 12 }} />
-                  <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fontSize: 10 }} />
-                  <Radar name="Índices" dataKey="value" stroke="#4f46e5" fill="#4f46e5" fillOpacity={0.4} />
-                  <Tooltip formatter={(value: number) => [value.toFixed(1), '']} />
+                  <PolarRadiusAxis angle={90} domain={[0, 100]} tickCount={5} tick={{ fontSize: 10 }} />
+                  <Radar name="Índices (0–100)" dataKey="value" stroke="#4f46e5" fill="#4f46e5" fillOpacity={0.4} />
+                  <Tooltip
+                    formatter={(value: number) => [`${value.toFixed(1)} pts`, '']}
+                    labelFormatter={(label) => String(label)}
+                  />
                   <Legend />
                 </RadarChart>
               </ResponsiveContainer>
@@ -302,6 +330,12 @@ export function MaturidadePanelClient({
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
+            {!itsmoAligned && (
+              <p className="text-xs text-[var(--color-text-muted)]">
+                Nota: ITSMO armazenado ({itsmo.toFixed(1)}) difere ligeiramente da recomposição 0,40×IC + 0,35×IH +
+                0,25×IP ({itsmoFromPillars.toFixed(1)}) — prevalece o valor guardado no diagnóstico.
+              </p>
+            )}
             <p className="text-sm leading-relaxed text-[var(--color-text)]">
               {getExecutiveTextITSMO(result.nivel)}
             </p>
@@ -376,36 +410,44 @@ export function MaturidadePanelClient({
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-4">
               <p className="text-xs font-semibold uppercase text-[var(--color-text-muted)]">IC – {SUPHO_PILARES.A.nomeCurto}</p>
-              <p className="mt-1 text-lg font-semibold text-[var(--color-text)]">{result.ic.toFixed(1)}</p>
-              <p className="mt-2 text-sm text-[var(--color-text-muted)]">{getExecutiveTextIC(result.ic)}</p>
+              <p className="mt-1 text-lg font-semibold tabular-nums text-[var(--color-text)]">{ic.toFixed(1)}</p>
+              <p className="text-[11px] text-[var(--color-text-muted)]">Pontos na escala 0–100</p>
+              <p className="mt-2 text-sm text-[var(--color-text-muted)]">{getExecutiveTextIC(ic)}</p>
             </div>
             <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-4">
               <p className="text-xs font-semibold uppercase text-[var(--color-text-muted)]">IH – {SUPHO_PILARES.B.nomeCurto}</p>
-              <p className="mt-1 text-lg font-semibold text-[var(--color-text)]">{result.ih.toFixed(1)}</p>
-              <p className="mt-2 text-sm text-[var(--color-text-muted)]">{getExecutiveTextIH(result.ih)}</p>
+              <p className="mt-1 text-lg font-semibold tabular-nums text-[var(--color-text)]">{ih.toFixed(1)}</p>
+              <p className="text-[11px] text-[var(--color-text-muted)]">Pontos na escala 0–100</p>
+              <p className="mt-2 text-sm text-[var(--color-text-muted)]">{getExecutiveTextIH(ih)}</p>
             </div>
             <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-4">
               <p className="text-xs font-semibold uppercase text-[var(--color-text-muted)]">IP – {SUPHO_PILARES.C.nomeCurto}</p>
-              <p className="mt-1 text-lg font-semibold text-[var(--color-text)]">{result.ip.toFixed(1)}</p>
-              <p className="mt-2 text-sm text-[var(--color-text-muted)]">{getExecutiveTextIP(result.ip)}</p>
+              <p className="mt-1 text-lg font-semibold tabular-nums text-[var(--color-text)]">{ip.toFixed(1)}</p>
+              <p className="text-[11px] text-[var(--color-text-muted)]">Pontos na escala 0–100</p>
+              <p className="mt-2 text-sm text-[var(--color-text-muted)]">{getExecutiveTextIP(ip)}</p>
             </div>
             <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-4">
               <p className="text-xs font-semibold uppercase text-[var(--color-text-muted)]">Gap Cultura–Humano</p>
-              <p className="mt-1 text-lg font-semibold text-[var(--color-text)]">{result.gapCH.toFixed(1)}</p>
-              <p className="mt-2 text-sm text-[var(--color-text-muted)]">{getExecutiveTextGapCH(result.gapCH)}</p>
+              <p className="mt-1 text-lg font-semibold tabular-nums text-[var(--color-text)]">{gapCH.toFixed(1)}</p>
+              <p className="text-[11px] text-[var(--color-text-muted)]">Diferença |IC − IH| em pontos (0–100)</p>
+              <p className="mt-2 text-sm text-[var(--color-text-muted)]">{getExecutiveTextGapCH(gapCH)}</p>
             </div>
             <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-4">
               <p className="text-xs font-semibold uppercase text-[var(--color-text-muted)]">Gap Cultura–Performance</p>
-              <p className="mt-1 text-lg font-semibold text-[var(--color-text)]">{result.gapCP.toFixed(1)}</p>
-              <p className="mt-2 text-sm text-[var(--color-text-muted)]">{getExecutiveTextGapCP(result.gapCP)}</p>
+              <p className="mt-1 text-lg font-semibold tabular-nums text-[var(--color-text)]">{gapCP.toFixed(1)}</p>
+              <p className="text-[11px] text-[var(--color-text-muted)]">Diferença |IC − IP| em pontos (0–100)</p>
+              <p className="mt-2 text-sm text-[var(--color-text-muted)]">{getExecutiveTextGapCP(gapCP)}</p>
             </div>
-            <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-4 sm:col-span-2 lg:col-span-1">
-              <p className="text-xs font-semibold uppercase text-[var(--color-text-muted)]">Subíndices (escala 1–5)</p>
-              <p className="mt-1 text-sm text-[var(--color-text)]">
-                ISE {result.ise.toFixed(2)} · IPT {result.ipt.toFixed(2)} · ICL {result.icl.toFixed(2)}
+            <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-4 sm:col-span-2 lg:col-span-3">
+              <p className="text-xs font-semibold uppercase text-[var(--color-text-muted)]">Subíndices (escala Likert 1–5)</p>
+              <p className="mt-2 text-sm text-[var(--color-text)]">
+                <span className="font-medium">ISE</span> {ise.toFixed(2)} — {getExecutiveTextISE(ise)}
               </p>
-              <p className="mt-2 text-sm text-[var(--color-text-muted)]">
-                {getExecutiveTextISE(result.ise)}
+              <p className="mt-3 text-sm text-[var(--color-text)]">
+                <span className="font-medium">IPT</span> {ipt.toFixed(2)} — {getExecutiveTextIPT(ipt)}
+              </p>
+              <p className="mt-3 text-sm text-[var(--color-text)]">
+                <span className="font-medium">ICL</span> {icl.toFixed(2)} — {getExecutiveTextICL(icl)}
               </p>
             </div>
           </div>

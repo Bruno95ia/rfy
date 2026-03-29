@@ -1,7 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-/** Excel/CSV grandes podem demorar a parsear */
-export const maxDuration = 120;
 import { z } from 'zod';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requireApiAuth, requireApiUserOrgAccess } from '@/lib/auth';
@@ -20,6 +17,9 @@ import {
   persistSuphoImportGroups,
 } from '@/lib/supho/import-external-responses';
 import { persistSuphoImportKnowledgeSnapshot } from '@/lib/org/knowledge';
+
+/** Excel/CSV grandes podem demorar a parsear */
+export const maxDuration = 120;
 
 const MAX_FILE_BYTES = 12 * 1024 * 1024;
 

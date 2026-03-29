@@ -1,4 +1,5 @@
 import { requireAuth, getOrgIdForUser } from '@/lib/auth';
+import { toPlainSerializable } from '@/lib/serialize-props';
 import { createClient } from '@/lib/supabase/server';
 import { UploadsList } from './UploadsList';
 import { UploadForm } from './UploadForm';
@@ -38,7 +39,7 @@ export default async function UploadsPage() {
     console.error('[uploads/page] Falha ao listar uploads:', uploadsError.message);
   }
   type UploadRow = { id: string; filename: string; kind: string; status: string; error_message: string | null; created_at: string; processed_at: string | null };
-  const uploadRows = (uploads ?? []) as UploadRow[];
+  const uploadRows = toPlainSerializable((uploads ?? []) as UploadRow[]);
   const doneCount = uploadRows.filter((u) => u.status === 'done').length;
   const processingCount = uploadRows.filter((u) => u.status === 'processing').length;
   const failedCount = uploadRows.filter((u) => u.status === 'failed').length;

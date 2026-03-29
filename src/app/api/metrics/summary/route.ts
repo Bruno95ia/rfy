@@ -8,6 +8,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { requireAuthAndOrgAccess } from '@/lib/auth';
 import { computeRfySummary } from '@/lib/metrics/rfy-summary';
 import { METRICS_DEFINITION_VERSION } from '@/lib/metrics/definitions';
+import { isMissingMetricsDefinitionColumnError } from '@/lib/metrics/schema-fallback';
 
 const AI_BASE = process.env.AI_SERVICE_URL ?? 'http://localhost:8001';
 const AI_FETCH_TIMEOUT_MS = 25000;
@@ -30,13 +31,30 @@ export async function GET(req: NextRequest) {
   if (!auth.ok) return auth.response;
 
   const admin = createAdminClient();
-  const { data: report } = await admin
+  let reportRes = await admin
     .from('reports')
     .select('generated_at, snapshot_json, metrics_definition_version')
     .eq('org_id', auth.orgId)
     .order('generated_at', { ascending: false })
     .limit(1)
     .maybeSingle();
+
+  if (reportRes.error && isMissingMetricsDefinitionColumnError(reportRes.error.message)) {
+    // eslint-disable-next-line no-console
+    console.warn('[metrics/summary] fallback sem metrics_definition_version (aplique migration 020)');
+    reportRes = await admin
+      .from('reports')
+      .select('generated_at, snapshot_json')
+      .eq('org_id', auth.orgId)
+      .order('generated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+  } else if (reportRes.error) {
+    // eslint-disable-next-line no-console
+    console.warn('[metrics/summary] reports query', reportRes.error.message);
+  }
+
+  const report = reportRes.data;
 
   const snapshot = (report?.snapshot_json as Record<string, unknown>) ?? {};
   const pipelineValueOpen = Number(snapshot?.pipeline_value_open) || 0;
@@ -78,13 +96,17 @@ export async function GET(req: NextRequest) {
     pipelineBruto,
   });
 
-  const rawVersion = report?.metrics_definition_version;
+  const reportRow = report as Record<string, unknown> | null;
+  const hasVersionColumn = reportRow != null && 'metrics_definition_version' in reportRow;
+  const rawVer = reportRow?.metrics_definition_version;
   const metricsDefinitionVersionResolved =
     report == null
       ? null
-      : typeof rawVersion === 'string' && rawVersion.length > 0
-        ? rawVersion
-        : METRICS_DEFINITION_VERSION;
+      : typeof rawVer === 'string' && rawVer.length > 0
+        ? rawVer
+        : hasVersionColumn
+          ? METRICS_DEFINITION_VERSION
+          : null;
 
   const body: MetricsSummaryResponse = {
     generated_at: report?.generated_at ?? null,

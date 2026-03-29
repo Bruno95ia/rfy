@@ -202,6 +202,17 @@ Testes em `tests/unit`, `tests/integration`, `tests/e2e`.
 - **Backup**: `docs/BACKUP-RESTORE.md`, `docs/BACKUP_ESTRUTURA_*.md`.
 - **Git**: `docs/GIT.md`.
 
+### 10.1 Deploy e ordem com a base de dados
+
+1. Use o **mesmo** `DATABASE_URL` no processo Node (PM2, Docker app, systemd) e ao correr `npm run db:migrate` no servidor ou CI (RDS ≠ Postgres local por defeito).
+2. **Ordem recomendada:** aplicar migrations (`npm run db:migrate`) **antes** ou **junto** do deploy do código que depende de novas colunas; nunca editar `supabase/sql/schema.sql` depois da primeira aplicação — novas alterações vão para ficheiros em `supabase/sql/migrations/`.
+3. **Verificação pós-migrate** (ex.: migration 020 — `metrics_definition_version` em `reports`):
+
+```bash
+psql "$DATABASE_URL" -c "SELECT version FROM public.schema_migrations WHERE version LIKE '%020%';"
+psql "$DATABASE_URL" -c "SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='reports' AND column_name='metrics_definition_version';"
+```
+
 ---
 
 ## Documentação relacionada

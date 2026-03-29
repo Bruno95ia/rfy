@@ -27,7 +27,7 @@ export function SuphoExternalImportForm({ orgId }: Props) {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch('/api/supho/campaigns');
+        const res = await fetch('/api/supho/campaigns', { credentials: 'include' });
         if (!res.ok) throw new Error('Falha ao listar campanhas');
         const data = (await res.json()) as Campaign[];
         if (!cancelled) {
@@ -66,6 +66,7 @@ export function SuphoExternalImportForm({ orgId }: Props) {
     try {
       const res = await fetch('/api/supho/import-responses', {
         method: 'POST',
+        credentials: 'include',
         body: formData,
       });
       const data = await res.json().catch(() => ({}));
@@ -117,21 +118,32 @@ export function SuphoExternalImportForm({ orgId }: Props) {
             ))}
           </select>
           <p className="text-xs text-slate-500">
-            As respostas serão associadas a esta campanha. Perguntas devem ser UUIDs válidos da sua base SUPHO.
+            As respostas serão associadas a esta campanha. No formato largo (Luma/Google), a ordem das colunas de
+            pergunta deve coincidir com a campanha. No formato longo, cada linha usa{' '}
+            <code className="rounded bg-slate-100 px-1">question_id</code> (UUID em /api/supho/questions).
           </p>
         </div>
-        <Button variant="outline" size="sm" className="shrink-0 gap-2" asChild>
-          <a href="/api/supho/import-responses" download="modelo-supho-import.csv">
-            <Download className="h-4 w-4" />
-            Modelo CSV
+        <div className="flex flex-col gap-2 sm:items-end shrink-0">
+          <Button variant="outline" size="sm" className="gap-2 w-full sm:w-auto" asChild>
+            <a href="/api/supho/import-responses" download="modelo-supho-import-largo.csv">
+              <Download className="h-4 w-4" />
+              Modelo CSV (largo — Luma/Google)
+            </a>
+          </Button>
+          <a
+            href="/api/supho/import-responses?variant=long"
+            className="text-xs text-center sm:text-right text-indigo-600 hover:underline"
+            download="modelo-supho-import-longo.csv"
+          >
+            Baixar modelo formato longo (UUIDs)
           </a>
-        </Button>
+        </div>
       </div>
 
       <div className="grid gap-3 text-xs text-slate-500 sm:grid-cols-3">
         <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
           <FileSpreadsheet className="h-4 w-4 text-indigo-500" />
-          Planilha (CSV, TSV, Excel…): respondent, question_id ou id_question, value
+          Formato longo: respondent, question_id, value — ou formato largo (Google/Luma): uma linha por pessoa
         </div>
         <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
           <FileJson className="h-4 w-4 text-indigo-500" />
@@ -162,8 +174,9 @@ export function SuphoExternalImportForm({ orgId }: Props) {
           className="block w-full text-sm text-slate-600 file:mr-4 file:rounded-lg file:border-0 file:bg-indigo-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-indigo-700 hover:file:bg-indigo-100 disabled:opacity-50"
         />
         <p className="mt-3 text-xs text-slate-500">
-          Se você abriu o modelo CSV no Excel e tudo ficou na coluna A, pode enviar assim mesmo — o import
-          reconhece. Preferível: colunas separadas (respondent, question_id, value) ou JSON da API. Perguntas:{' '}
+          Google/Luma: colunas iniciais (data, e-mail, nome…) e depois notas 1–5; colunas a mais são ignoradas;
+          células vazias numa pergunta são ignoradas; números tipo 4,0 são aceites. Coluna A com CSV inteiro
+          também. Ordem das perguntas:{' '}
           <a href="/api/supho/questions" className="text-indigo-600 hover:underline" target="_blank" rel="noreferrer">
             /api/supho/questions
           </a>

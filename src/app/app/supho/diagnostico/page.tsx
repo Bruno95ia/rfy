@@ -1,4 +1,5 @@
 import { requireAuth, getOrgIdForUser } from '@/lib/auth';
+import { toPlainSerializable } from '@/lib/serialize-props';
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { DiagnosticoClient } from './DiagnosticoClient';
@@ -35,7 +36,15 @@ export default async function DiagnosticoPage() {
       />
       <DiagnosticoClient
         orgId={orgId}
-        initialCampaigns={(campaigns ?? []) as { id: string; name: string; status: string; created_at: string; question_ids?: string[] | null }[]}
+        initialCampaigns={toPlainSerializable(
+          (campaigns ?? []) as Array<{
+            id: string;
+            name: string;
+            status: string;
+            created_at: string;
+            question_ids?: string[] | null;
+          }>
+        )}
       />
     </div>
   );

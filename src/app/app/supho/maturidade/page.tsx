@@ -1,4 +1,5 @@
 import { requireAuth, getOrgIdForUser } from '@/lib/auth';
+import { toIsoString, toPlainSerializable } from '@/lib/serialize-props';
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/layout/PageHeader';
 import Link from 'next/link';
@@ -33,7 +34,7 @@ export default async function MaturidadePage() {
     ? {
         id: latestResult.id,
         campaignId: latestResult.campaign_id,
-        computedAt: latestResult.computed_at,
+        computedAt: toIsoString(latestResult.computed_at),
         ic: Number(latestResult.ic),
         ih: Number(latestResult.ih),
         ip: Number(latestResult.ip),
@@ -44,7 +45,7 @@ export default async function MaturidadePage() {
         ise: latestResult.ise != null ? Number(latestResult.ise) : 0,
         ipt: latestResult.ipt != null ? Number(latestResult.ipt) : 0,
         icl: latestResult.icl != null ? Number(latestResult.icl) : 0,
-        sampleSize: latestResult.sample_size ?? 0,
+        sampleSize: Number(latestResult.sample_size ?? 0),
       }
     : null;
 
@@ -100,7 +101,10 @@ export default async function MaturidadePage() {
         title="Painel de Maturidade SUPHO"
         subtitle="Visão integrada do último diagnóstico: radar dos pilares, nível de maturidade (ITSMO), gaps e leitura executiva."
       />
-      <MaturidadePanelClient result={result} enrichment={enrichment} />
+      <MaturidadePanelClient
+        result={toPlainSerializable(result)}
+        enrichment={toPlainSerializable(enrichment)}
+      />
       <HistoricoDiagnosticoClient />
     </div>
   );

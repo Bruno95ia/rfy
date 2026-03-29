@@ -28,7 +28,13 @@ export default function AppError({
         <p className="max-w-md text-sm text-slate-600">
           Ocorreu um erro ao carregar esta página. Tente novamente ou volte ao dashboard.
         </p>
-        {process.env.NODE_ENV === 'development' && (
+        {error.digest ? (
+          <p className="max-w-md text-center font-mono text-[11px] text-slate-500">
+            digest: {error.digest}
+          </p>
+        ) : null}
+        {(process.env.NODE_ENV === 'development' ||
+          process.env.NEXT_PUBLIC_SHOW_CLIENT_ERRORS === 'true') && (
           <p className="max-w-lg break-words rounded-md bg-white/80 px-3 py-2 font-mono text-xs text-red-800">
             {error.message}
           </p>

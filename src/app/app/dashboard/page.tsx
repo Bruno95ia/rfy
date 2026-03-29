@@ -1,7 +1,14 @@
 import { requireAuth, getOrgIdForUser, getOrgMemberRole } from '@/lib/auth';
 import { getProcessedUploads30d } from '@/lib/org/usage';
+import { isMissingMetricsDefinitionColumnError } from '@/lib/metrics/schema-fallback';
+import {
+  normalizeFrictionsJson,
+  normalizeSnapshotJson,
+  toIsoString,
+  toPlainSerializable,
+} from '@/lib/serialize-props';
 import { createClient } from '@/lib/supabase/server';
-import { DashboardClient } from './DashboardClient';
+import { DashboardClient, type DashboardClientProps } from './DashboardClient';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { GettingStartedCard } from '@/components/layout/GettingStartedCard';
 import Link from 'next/link';
@@ -23,13 +30,37 @@ export default async function DashboardPage() {
     );
   }
 
-  const { data: report } = await supabase
+  const reportsSelectFull =
+    'id, snapshot_json, frictions_json, pillar_scores_json, generated_at, metrics_definition_version';
+  const reportsSelectLegacy =
+    'id, snapshot_json, frictions_json, pillar_scores_json, generated_at';
+
+  let reportRes = await supabase
     .from('reports')
-    .select('id, snapshot_json, frictions_json, pillar_scores_json, generated_at, metrics_definition_version')
+    .select(reportsSelectFull)
     .eq('org_id', orgId)
     .order('generated_at', { ascending: false })
     .limit(1)
     .maybeSingle();
+
+  if (reportRes.error && isMissingMetricsDefinitionColumnError(reportRes.error.message)) {
+    // eslint-disable-next-line no-console
+    console.warn('[dashboard] reports: coluna metrics_definition_version ausente; fallback sem semver', {
+      orgIdPrefix: orgId.slice(0, 8),
+    });
+    reportRes = await supabase
+      .from('reports')
+      .select(reportsSelectLegacy)
+      .eq('org_id', orgId)
+      .order('generated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+  } else if (reportRes.error) {
+    // eslint-disable-next-line no-console
+    console.warn('[dashboard] reports query', orgId.slice(0, 8), reportRes.error.message);
+  }
+
+  const report = reportRes.data;
 
   const processedUploads30d = await getProcessedUploads30d(orgId);
   const showGettingStarted = !report && processedUploads30d === 0;
@@ -44,7 +75,7 @@ export default async function DashboardPage() {
 
   const suphoResult = latestSupho
     ? {
-        computedAt: latestSupho.computed_at as string,
+        computedAt: toIsoString(latestSupho.computed_at),
         ic: Number(latestSupho.ic),
         ih: Number(latestSupho.ih),
         ip: Number(latestSupho.ip),
@@ -55,7 +86,7 @@ export default async function DashboardPage() {
         ise: latestSupho.ise != null ? Number(latestSupho.ise) : 0,
         ipt: latestSupho.ipt != null ? Number(latestSupho.ipt) : 0,
         icl: latestSupho.icl != null ? Number(latestSupho.icl) : 0,
-        sampleSize: latestSupho.sample_size ?? 0,
+        sampleSize: Number(latestSupho.sample_size ?? 0),
       }
     : null;
 
@@ -67,7 +98,7 @@ export default async function DashboardPage() {
       .select('*')
       .eq('org_id', orgId)
       .maybeSingle();
-    unitEconomics = (ue as Record<string, unknown>) ?? null;
+    unitEconomics = ue ? (ue as Record<string, unknown>) : null;
 
     const { data: icp } = await supabase
       .from('org_icp_studies')
@@ -80,7 +111,7 @@ export default async function DashboardPage() {
       icpCached = {
         icp_summary: icp.icp_summary ?? '',
         icp_study_json: (icp.icp_study_json as Record<string, unknown>) ?? {},
-        generated_at: icp.generated_at ?? new Date().toISOString(),
+        generated_at: toIsoString(icp.generated_at),
       };
     }
   } catch {
@@ -96,6 +127,23 @@ export default async function DashboardPage() {
   const subtitle = isExecutive
     ? `${greeting}. Visão de governança: Receita Confiável, distorção (Receita Inflada) e as 3 decisões prioritárias para reduzir risco.`
     : `${greeting}. Visão executiva para RFY Index, Receita Confiável, Receita Inflada, alertas e decisões prioritárias.`;
+
+  const dashboardProps: DashboardClientProps = {
+    orgId,
+    userRole: role ?? 'viewer',
+    snapshot: normalizeSnapshotJson(report?.snapshot_json),
+    frictions: normalizeFrictionsJson(report?.frictions_json),
+    pillarScores: normalizeSnapshotJson(report?.pillar_scores_json),
+    generatedAt: report?.generated_at != null ? toIsoString(report.generated_at) : null,
+    suphoResult,
+    unitEconomics,
+    icpCached,
+    initialMetricsDefinitionVersion:
+      typeof report?.metrics_definition_version === 'string'
+        ? report.metrics_definition_version
+        : null,
+  };
+  const safeDashboardProps = toPlainSerializable(dashboardProps) as DashboardClientProps;
 
   return (
     <div className="space-y-8">
@@ -147,22 +195,7 @@ export default async function DashboardPage() {
         }
       />
       {showGettingStarted && <GettingStartedCard />}
-      <DashboardClient
-        orgId={orgId}
-        userRole={role ?? 'viewer'}
-        snapshot={report?.snapshot_json as Record<string, unknown> | null}
-        frictions={report?.frictions_json as Array<Record<string, unknown>> | null}
-        pillarScores={report?.pillar_scores_json as Record<string, unknown> | null}
-        generatedAt={report?.generated_at ?? null}
-        suphoResult={suphoResult}
-        unitEconomics={unitEconomics}
-        icpCached={icpCached}
-        initialMetricsDefinitionVersion={
-          typeof report?.metrics_definition_version === 'string'
-            ? report.metrics_definition_version
-            : null
-        }
-      />
+      <DashboardClient {...safeDashboardProps} />
     </div>
   );
 }

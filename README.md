@@ -92,6 +92,12 @@ Parar serviços locais de dados:
 npm run db:down
 ```
 
+### Deploy (produção / staging)
+
+- Use o **mesmo** `DATABASE_URL` na aplicação e ao correr `npm run db:migrate` (se migrares só no Docker local e a app apontar para RDS, o schema fica desalinhado).
+- **Ordem:** aplicar migrations **antes** do tráfego depender de colunas novas; não voltar a editar `supabase/sql/schema.sql` após a primeira carga — alterações incrementais em `supabase/sql/migrations/`.
+- Verificação: ver secção **10.1** em `docs/SISTEMA-DOCUMENTACAO-COMPLETA.md` (exemplo de SQL para confirmar migrations e colunas).
+
 ### 4. Configurar variáveis de ambiente
 
 Se não existir `.env.local`:

@@ -1,4 +1,5 @@
 import { requireAuth, getOrgIdForUser } from '@/lib/auth';
+import { toPlainSerializable } from '@/lib/serialize-props';
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/layout/PageHeader';
 import Link from 'next/link';
@@ -35,7 +36,18 @@ export default async function PAIPPage() {
         title="PAIP — Plano de Ação"
         subtitle="Plano 90–180 dias: gaps, objetivos, KRs e ações vinculados ao diagnóstico e ao CRM"
       />
-      <PAIPClient initialPlans={(plans ?? []) as { id: string; name: string; status: string; period_start: string; period_end: string; created_at: string }[]} />
+      <PAIPClient
+        initialPlans={toPlainSerializable(
+          (plans ?? []) as Array<{
+            id: string;
+            name: string;
+            status: string;
+            period_start: string;
+            period_end: string;
+            created_at: string;
+          }>
+        )}
+      />
     </div>
   );
 }

@@ -17,6 +17,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { readApiErrorMessage } from '@/lib/read-api-error';
 import { useToast } from '@/components/ui/use-toast';
 import {
   Dialog,
@@ -121,12 +122,13 @@ export function UploadsList({ uploads }: { uploads: UploadRecord[] }) {
     try {
       const res = await fetch('/api/upload/reprocess', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ uploadId: id }),
       });
-      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(data?.error ?? `Erro ${res.status}`);
+        const msg = await readApiErrorMessage(res);
+        throw new Error(msg);
       }
       toast({
         title: 'Reprocessamento enfileirado',

@@ -6,6 +6,7 @@ import { ClipboardList, Download, FileJson, FileSpreadsheet } from 'lucide-react
 import { useToast } from '@/components/ui/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { readApiErrorMessage } from '@/lib/read-api-error';
 import { UsageLimitsHint, useUploadLimitGate } from './UsageLimitsHint';
 
 type Campaign = { id: string; name: string; status: string };
@@ -69,11 +70,16 @@ export function SuphoExternalImportForm({ orgId }: Props) {
         credentials: 'include',
         body: formData,
       });
-      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(typeof data.error === 'string' ? data.error : 'Erro na importação');
+        const msg = await readApiErrorMessage(res);
+        throw new Error(msg);
       }
-      const saved = (data as { import_file_saved?: boolean }).import_file_saved === true;
+      const data = (await res.json().catch(() => ({}))) as {
+        respondents?: number;
+        answer_rows?: number;
+        import_file_saved?: boolean;
+      };
+      const saved = data.import_file_saved === true;
       toast({
         title: 'Importação concluída',
         description: `${data.respondents ?? 0} respondente(s), ${data.answer_rows ?? 0} resposta(s).${

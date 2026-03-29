@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   AlertCircle,
 } from 'lucide-react';
+import { readApiErrorMessage } from '@/lib/read-api-error';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 import { UsageLimitsHint, useUploadLimitGate } from './UsageLimitsHint';
@@ -46,12 +47,13 @@ export function DemoPackForm({ orgId }: DemoPackFormProps) {
 
       const res = await fetch('/api/demo/upload-pack', {
         method: 'POST',
+        credentials: 'include',
         body: formData,
       });
 
-      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(data.error ?? 'Erro ao enviar demonstração');
+        const msg = await readApiErrorMessage(res);
+        throw new Error(msg);
       }
 
       toast({

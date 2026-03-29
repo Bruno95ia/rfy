@@ -3,6 +3,13 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   output: 'standalone',
   serverExternalPackages: ['pdf-parse', 'mammoth', 'xlsx'],
+  /** Uploads multipart (pipeline, SUPHO, demo pack) — default do Next é ~10MB e cortava ficheiros maiores antes da rota. */
+  experimental: {
+    proxyClientMaxBodySize: '60mb',
+    serverActions: {
+      bodySizeLimit: '60mb',
+    },
+  },
   async rewrites() {
     return [
       { source: '/apple-touch-icon.png', destination: '/logo/revenue-engine-symbol-favicon.svg' },

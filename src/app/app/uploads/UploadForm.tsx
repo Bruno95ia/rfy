@@ -6,6 +6,7 @@ import { Database, FileSpreadsheet, ListChecks } from 'lucide-react';
 import { UploadDropzone } from '@/components/UploadDropzone';
 import { useToast } from '@/components/ui/use-toast';
 import { Badge } from '@/components/ui/badge';
+import { readApiErrorMessage } from '@/lib/read-api-error';
 import { UsageLimitsHint, useUploadLimitGate } from './UsageLimitsHint';
 
 type Kind = 'opportunities' | 'activities';
@@ -28,12 +29,13 @@ export function UploadForm({ orgId }: UploadFormProps) {
 
     const res = await fetch('/api/upload', {
       method: 'POST',
+      credentials: 'include',
       body: formData,
     });
 
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error ?? 'Erro no upload');
+      const msg = await readApiErrorMessage(res);
+      throw new Error(msg);
     }
     toast({
       title: 'Upload realizado',

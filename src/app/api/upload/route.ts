@@ -12,6 +12,8 @@ import {
 import { computeAndPersistReport } from '@/lib/report-compute-persist';
 import { NextResponse } from 'next/server';
 
+export const maxDuration = 120;
+
 const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024; // 50 MB
 
 const uploadFormSchema = z.object({

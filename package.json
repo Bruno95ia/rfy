@@ -16,6 +16,7 @@
     "test:e2e:smoke": "playwright test tests/e2e/auth.spec.ts tests/e2e/dashboard-supho.spec.ts",
     "demo:video": "bash scripts/demo-video.sh",
     "demo:video:cfo": "bash scripts/cfo-demo-video.sh",
+    "demo:video:cfo-live": "bash scripts/cfo-demo-live-video.sh",
     "inngest": "npx inngest-cli@latest dev",
     "setup": "bash scripts/setup.sh",
     "db:up": "bash scripts/db-up.sh",

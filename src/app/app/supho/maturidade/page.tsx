@@ -3,8 +3,10 @@ import { toIsoString, toPlainSerializable } from '@/lib/serialize-props';
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/layout/PageHeader';
 import {
+  fetchCampaignByCanonicalName,
   fetchCurrentCampaignForMaturity,
   isUploadsContextNewerThanCompute,
+  MATURITY_CANONICAL_CAMPAIGN_NAME,
 } from '@/lib/supho/maturidade-campaign';
 import { MaturidadePanelClient } from './MaturidadePanelClient';
 import { HistoricoDiagnosticoClient } from './HistoricoDiagnosticoClient';
@@ -22,15 +24,37 @@ export default async function MaturidadePage() {
     );
   }
 
-  const { data: latestResult } = await supabase
-    .from('supho_diagnostic_results')
-    .select(
-      'id, campaign_id, computed_at, ic, ih, ip, itsmo, nivel, gap_c_h, gap_c_p, ise, ipt, icl, sample_size, result_json'
-    )
-    .eq('org_id', orgId)
-    .order('computed_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  let preferredCampaign: Awaited<ReturnType<typeof fetchCampaignByCanonicalName>> = null;
+  try {
+    preferredCampaign = await fetchCampaignByCanonicalName(
+      supabase,
+      orgId,
+      MATURITY_CANONICAL_CAMPAIGN_NAME
+    );
+  } catch (e) {
+    console.error('[supho/maturidade] fetchCampaignByCanonicalName', e);
+  }
+
+  const { data: latestResult } = preferredCampaign
+    ? await supabase
+        .from('supho_diagnostic_results')
+        .select(
+          'id, campaign_id, computed_at, ic, ih, ip, itsmo, nivel, gap_c_h, gap_c_p, ise, ipt, icl, sample_size, result_json'
+        )
+        .eq('org_id', orgId)
+        .eq('campaign_id', preferredCampaign.id)
+        .order('computed_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+    : await supabase
+        .from('supho_diagnostic_results')
+        .select(
+          'id, campaign_id, computed_at, ic, ih, ip, itsmo, nivel, gap_c_h, gap_c_p, ise, ipt, icl, sample_size, result_json'
+        )
+        .eq('org_id', orgId)
+        .order('computed_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
   type CampaignRow = { id: string; name: string; uploads_context_updated_at: string | null };
   let campaignRowForResult: CampaignRow | null = null;
@@ -139,6 +163,16 @@ export default async function MaturidadePage() {
                 gapCP: Number((rj.indicesFromSurvey as { gapCP?: unknown }).gapCP),
               }
             : null,
+        systemsAdjusted:
+          rj?.systemsAdjusted && typeof rj.systemsAdjusted === 'object' && rj.systemsAdjusted !== null
+            ? {
+                ip: Number((rj.systemsAdjusted as { ip?: unknown }).ip),
+                itsmo: Number((rj.systemsAdjusted as { itsmo?: unknown }).itsmo),
+                nivel: Number((rj.systemsAdjusted as { nivel?: unknown }).nivel),
+                gapCH: Number((rj.systemsAdjusted as { gapCH?: unknown }).gapCH),
+                gapCP: Number((rj.systemsAdjusted as { gapCP?: unknown }).gapCP),
+              }
+            : null,
       }
     : null;
 
@@ -164,7 +198,9 @@ export default async function MaturidadePage() {
     }
   }
 
-  const emptyStateCampaign = !latestResult ? await fetchCurrentCampaignForMaturity(supabase, orgId) : null;
+  const emptyStateCampaign = !latestResult
+    ? preferredCampaign ?? (await fetchCurrentCampaignForMaturity(supabase, orgId))
+    : null;
 
   const campaignContext =
     result && latestResult
@@ -191,10 +227,14 @@ export default async function MaturidadePage() {
         : null;
 
   const pageSubtitle = latestResult
-    ? `Último diagnóstico calculado na organização${
-        campaignRowForResult?.name ? ` (campanha ${campaignRowForResult.name})` : ''
-      }. Índices e texto contextual referem-se a esse cálculo.`
-    : 'Crie uma campanha em Diagnóstico para medir maturidade. Sem resultados calculados, o painel sugere a campanha mais recentemente atualizada para começar.';
+    ? preferredCampaign
+      ? `Diagnóstico da campanha «${campaignRowForResult?.name ?? preferredCampaign.name}» (prioridade no painel). Índices e texto contextual referem-se a esse cálculo.`
+      : `Último diagnóstico calculado na organização${
+          campaignRowForResult?.name ? ` (campanha ${campaignRowForResult.name})` : ''
+        }. Índices e texto contextual referem-se a esse cálculo.`
+    : preferredCampaign
+      ? `A campanha «${preferredCampaign.name}» tem respostas, mas ainda sem diagnóstico calculado. Abra Diagnóstico e use «Calcular diagnóstico» para ver ITSMO e radar.`
+      : 'Crie uma campanha em Diagnóstico para medir maturidade. Sem resultados calculados, o painel sugere a campanha mais recentemente atualizada para começar.';
 
   return (
     <div className="space-y-6">

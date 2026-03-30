@@ -24,9 +24,13 @@ interface QueryBuilder<T = QueryResultRow> {
   range(from: number, to: number): QueryBuilder<T>;
   single(): Promise<{ data: T | null; error: DbError | null }>;
   maybeSingle(): Promise<{ data: T | null; error: DbError | null }>;
-  then(
-    resolve: (value: { data: T[] | null; error: DbError | null; count?: number }) => void
-  ): void;
+  then<TResult1 = { data: T[] | null; error: DbError | null; count?: number }, TResult2 = never>(
+    onfulfilled?:
+      | ((value: { data: T[] | null; error: DbError | null; count?: number }) => TResult1 | PromiseLike<TResult1>)
+      | null
+      | undefined,
+    onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null | undefined
+  ): Promise<TResult1 | TResult2>;
 }
 
 interface InsertBuilder<T = QueryResultRow> extends PromiseLike<{ data: T | T[] | null; error: DbError | null }> {
@@ -424,8 +428,16 @@ export class AdminDbClient {
         const row = (res.data && res.data[0]) ?? null;
         return { data: row as T | null, error: null };
       },
-      then(resolve: (v: { data: T[] | null; error: DbError | null; count?: number }) => void) {
-        runSelect().then(resolve);
+      then(
+        onfulfilled?:
+          | ((
+              value: { data: T[] | null; error: DbError | null; count?: number }
+            ) => unknown)
+          | null
+          | undefined,
+        onrejected?: ((reason: unknown) => unknown) | null | undefined
+      ) {
+        return runSelect().then(onfulfilled as never, onrejected);
       },
       insert(rowOrRows: Record<string, unknown> | Record<string, unknown>[]) {
         const isArray = Array.isArray(rowOrRows);

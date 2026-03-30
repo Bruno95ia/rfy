@@ -15,16 +15,21 @@ import {
 } from '@/lib/org/context-documents';
 import { appendKnowledgeFilesToBundle } from '@/lib/org/knowledge';
 import { filterQuestionAveragesForCampaign } from '@/lib/supho/campaign-questions';
-import { assessSystemsMaturity, applyIpPenalty } from '@/lib/supho/systems-maturity';
+import {
+  applyIpPenalty,
+  applyIpPenaltyUnrounded,
+  assessSystemsMaturity,
+} from '@/lib/supho/systems-maturity';
 import type { SuphoQuestionAverage } from '@/types/supho';
 import { requireApiCampaignAccess } from '@/lib/auth';
 
 /**
  * POST /api/supho/diagnostic/compute
  * Body: { campaign_id: string }
- * Calcula IC, IH, IP, ITSMO, nível, gaps e subíndices a partir das respostas da campanha,
- * aplica ajuste de imaturidade de sistemas (CRM/ERP), incorpora documentos de contexto da org
- * e persiste em supho_diagnostic_results.
+ * Calcula IC, IH, IP, ITSMO, nível, gaps e subíndices a partir das respostas da campanha (metodologia SUPHO),
+ * incorpora documentos de contexto da org e persiste em supho_diagnostic_results.
+ * Valores principais = questionário (alinhados ao relatório executivo). Penalidade CRM/ERP, se houver, vai só a
+ * result_json.systemsAdjusted.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -175,13 +180,26 @@ export async function POST(req: NextRequest) {
       hasActiveCrmIntegration,
       erpIntegrationStatus,
     });
-    const ipAdjusted = applyIpPenalty(result.ip, systemsAssessment.ipPenalty);
     const rawIc = computeBlockIndexUnrounded(questionAveragesForCompute, 'A');
     const rawIh = computeBlockIndexUnrounded(questionAveragesForCompute, 'B');
     const rawIp = computeBlockIndexUnrounded(questionAveragesForCompute, 'C');
-    const itsmoAdjusted = computeITSMOFromUnroundedPillars(rawIc, rawIh, ipAdjusted);
+    const ipAdjustedRaw = applyIpPenaltyUnrounded(rawIp, systemsAssessment.ipPenalty);
+    const ipAdjusted = applyIpPenalty(rawIp, systemsAssessment.ipPenalty);
+    const itsmoAdjusted = computeITSMOFromUnroundedPillars(rawIc, rawIh, ipAdjustedRaw);
     const nivelAdjusted = computeNivel(itsmoAdjusted);
     const gapsAdjusted = computeGaps(result.ic, result.ih, ipAdjusted);
+
+    /** Alinhado ao relatório executivo SUPHO: ITSMO = 0,40×IC + 0,35×IH + 0,25×IP (questionário). Ajuste CRM/ERP só aqui. */
+    const systemsAdjustedMeta =
+      systemsAssessment.ipPenalty > 0
+        ? {
+            ip: ipAdjusted,
+            itsmo: itsmoAdjusted,
+            nivel: nivelAdjusted,
+            gapCH: gapsAdjusted.gapCH,
+            gapCP: gapsAdjusted.gapCP,
+          }
+        : null;
 
     const ctxForBundle = (ctxRows ?? []) as Array<{ doc_key: string; body_markdown: string | null }>;
     let bundle = buildOrgContextBundleText(ctxForBundle);
@@ -223,8 +241,9 @@ export async function POST(req: NextRequest) {
           knowledgeFilenamesSample: knowledgeFilesUsed.slice(0, 15).map((f) => f.filename),
         },
         notePt:
-          'IC, IH, IP e ITSMO derivam apenas das respostas Likert (1–5) agregadas por bloco, com a seleção de perguntas da campanha quando definida. Documentos de contexto, uploads (síntese) e ficheiros de Conhecimento compõem o texto resumido para leitura; não alteram os índices numéricos. O pilar IP pode ser reduzido por penalidade de maturidade de sistemas (CRM/ERP).',
+          'IC, IH, IP, gaps e ITSMO guardados seguem o questionário SUPHO (Likert 1–5), com a seleção de perguntas da campanha quando definida — como no painel executivo (ex.: ITSMO = 0,40×IC + 0,35×IH + 0,25×IP). Documentos, uploads e Conhecimento entram só no texto contextual. Penalidade CRM/ERP é opcional e aparece em systemsAdjusted quando aplicável, sem alterar o ITSMO oficial do diagnóstico.',
       },
+      systemsAdjusted: systemsAdjustedMeta,
       indicesFromSurvey: {
         ic: result.ic,
         ih: result.ih,
@@ -252,11 +271,11 @@ export async function POST(req: NextRequest) {
       computed_at: new Date().toISOString(),
       ic: result.ic,
       ih: result.ih,
-      ip: ipAdjusted,
-      itsmo: itsmoAdjusted,
-      nivel: nivelAdjusted,
-      gap_c_h: gapsAdjusted.gapCH,
-      gap_c_p: gapsAdjusted.gapCP,
+      ip: result.ip,
+      itsmo: result.itsmo,
+      nivel: result.nivel,
+      gap_c_h: result.gapCH,
+      gap_c_p: result.gapCP,
       ise: result.ise,
       ipt: result.ipt,
       icl: result.icl,
@@ -276,17 +295,18 @@ export async function POST(req: NextRequest) {
       result: {
         ic: result.ic,
         ih: result.ih,
-        ip: ipAdjusted,
-        itsmo: itsmoAdjusted,
-        nivel: nivelAdjusted,
-        gapCH: gapsAdjusted.gapCH,
-        gapCP: gapsAdjusted.gapCP,
+        ip: result.ip,
+        itsmo: result.itsmo,
+        nivel: result.nivel,
+        gapCH: result.gapCH,
+        gapCP: result.gapCP,
         ise: result.ise,
         ipt: result.ipt,
         icl: result.icl,
         sampleSize,
         indicesFromSurvey: resultJson.indicesFromSurvey,
         systemsMaturity: resultJson.systemsMaturity,
+        systemsAdjusted: systemsAdjustedMeta,
         orgContextPresent: resultJson.orgContextPresent,
         sourcesUsedInCompute: resultJson.sourcesUsedInCompute,
       },

@@ -54,8 +54,16 @@ export function assessSystemsMaturity(input: SystemsMaturityInput): SystemsMatur
   };
 }
 
+/**
+ * IP após penalidade (0–100), sem arredondar.
+ * Usar com `rawIp` (Likert→100 em precisão plena) para compor ITSMO com IC/IH brutos.
+ */
+export function applyIpPenaltyUnrounded(rawIp0to100: number, penalty: number): number {
+  const next = rawIp0to100 - penalty;
+  return Math.max(0, Math.min(100, next));
+}
+
+/** IP após penalidade arredondado a 2 casas (persistência / gaps / UI). */
 export function applyIpPenalty(ip: number, penalty: number): number {
-  const next = ip - penalty;
-  const clamped = Math.max(0, Math.min(100, next));
-  return Math.round(clamped * 100) / 100;
+  return Math.round(applyIpPenaltyUnrounded(ip, penalty) * 100) / 100;
 }

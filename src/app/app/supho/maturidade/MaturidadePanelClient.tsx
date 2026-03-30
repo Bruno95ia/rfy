@@ -79,6 +79,14 @@ export type MaturidadeEnrichment = {
     gapCH: number;
     gapCP: number;
   } | null;
+  /** ITSMO/IP/gaps se CRM/ERP aplicasse penalidade (só leitura; painel principal = questionário). */
+  systemsAdjusted?: {
+    ip: number;
+    itsmo: number;
+    nivel: number;
+    gapCH: number;
+    gapCP: number;
+  } | null;
   /** Metadados do último cálculo: o que entrou nos índices vs texto contextual (result_json). */
   sourcesUsedInCompute?: {
     notePt: string;
@@ -301,8 +309,9 @@ export function MaturidadePanelClient({
               Radar IC / IH / IP
             </CardTitle>
             <p className="px-6 pb-0 text-xs text-[var(--color-text-muted)]">
-              Escala 0–100 (mesmos valores dos indicadores abaixo). IC, IH e IP refletem o último cálculo guardado
-              (IP inclui ajuste de sistemas quando aplicável).
+              Escala 0–100 (mesmos valores dos indicadores abaixo). Pilares do questionário SUPHO — alinhados ao relatório
+              executivo (ITSMO = 0,40×IC + 0,35×IH + 0,25×IP). Penalidade CRM/ERP não altera estes números; ver secção
+              contextual se houver ajuste opcional.
             </p>
           </CardHeader>
           <CardContent>
@@ -385,10 +394,11 @@ export function MaturidadePanelClient({
               <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-[var(--color-text)]">
                 {getSystemsMaturityNarrative(toSystemsAssessment(enrichment.systemsMaturity))}
               </p>
-              {enrichment.systemsMaturity.ipPenaltyApplied > 0 && enrichment.indicesFromSurvey && (
+              {enrichment.systemsMaturity.ipPenaltyApplied > 0 && enrichment.systemsAdjusted && (
                 <p className="mt-2 text-xs text-[var(--color-text-muted)]">
-                  Índices apenas do questionário (antes do ajuste de sistemas): ITSMO{' '}
-                  {enrichment.indicesFromSurvey.itsmo.toFixed(1)} · IP {enrichment.indicesFromSurvey.ip.toFixed(1)}.
+                  Leitura complementar com penalidade de sistemas (não substitui o ITSMO do painel): ITSMO{' '}
+                  {enrichment.systemsAdjusted.itsmo.toFixed(1)} · IP {enrichment.systemsAdjusted.ip.toFixed(1)} · Nível{' '}
+                  {enrichment.systemsAdjusted.nivel}.
                 </p>
               )}
             </div>

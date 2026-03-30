@@ -1,4 +1,10 @@
 /**
+ * Nome canónico (minúsculas) para priorizar uma campanha no painel quando existir na org
+ * (ex.: relatório executivo "Foodtest" — não confundir com "Campanha FoodTest" ou "Nova campanha").
+ */
+export const MATURITY_CANONICAL_CAMPAIGN_NAME = 'foodtest';
+
+/**
  * Resolve a campanha SUPHO considerada "atual" para o Painel de Maturidade:
  * prioriza campanhas abertas ou encerradas, ordenadas por updated_at (reflete uploads/síntese).
  */
@@ -45,6 +51,31 @@ function rowFrom(data: unknown): CurrentCampaignForMaturity | null {
 }
 
 /** Campanha mais recentemente atualizada entre open/closed; se não houver, a mais recente no geral (ex.: draft). */
+/**
+ * Campanha cujo nome normalizado coincide com `canonicalName` (ex.: "foodtest" para alinhar painel ao relatório).
+ * Se houver várias, usa a mais recentemente atualizada.
+ */
+export async function fetchCampaignByCanonicalName(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  orgId: string,
+  canonicalName: string
+): Promise<CurrentCampaignForMaturity | null> {
+  const target = canonicalName.trim().toLowerCase();
+  if (!target) return null;
+
+  const { data: rows, error } = await supabase
+    .from('supho_diagnostic_campaigns')
+    .select('id, name, status, updated_at, uploads_context_updated_at')
+    .eq('org_id', orgId)
+    .order('updated_at', { ascending: false });
+
+  if (error || !Array.isArray(rows)) return null;
+
+  const match = rows.find((r: { name?: string }) => String(r.name ?? '').trim().toLowerCase() === target);
+  return match ? rowFrom(match) : null;
+}
+
 export async function fetchCurrentCampaignForMaturity(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- cliente servidor custom (from → admin)
   supabase: any,

@@ -24,5 +24,10 @@ if [ -n "$LATEST" ]; then
   cp "$LATEST" docs/demo/rfy-cfo-demo.webm
   echo ""
   echo "==> Cópia estável: docs/demo/rfy-cfo-demo.webm ($(du -h docs/demo/rfy-cfo-demo.webm | cut -f1))"
-  echo "    Converter para MP4 (opcional): ffmpeg -i docs/demo/rfy-cfo-demo.webm -c:v libx264 -crf 22 -c:a aac docs/demo/rfy-cfo-demo.mp4"
+  if command -v ffmpeg >/dev/null 2>&1; then
+    ffmpeg -y -i docs/demo/rfy-cfo-demo.webm -c:v libx264 -crf 22 -preset medium -movflags +faststart -an docs/demo/rfy-cfo-demo.mp4 -loglevel error -stats
+    echo "==> MP4: docs/demo/rfy-cfo-demo.mp4 ($(du -h docs/demo/rfy-cfo-demo.mp4 | cut -f1))"
+  else
+    echo "    (instale ffmpeg para gerar docs/demo/rfy-cfo-demo.mp4 automaticamente)"
+  fi
 fi

@@ -29,7 +29,7 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      testIgnore: /(demo-rfy-video|cfo-demo-video|cfo-demo-live-video|cfo-demo-full-video)\.spec\.ts/,
+      testIgnore: /(demo-rfy-video|cfo-demo-video|cfo-demo-live-video|cfo-demo-full-video|cfo-demo-results-video)\.spec\.ts/,
       use: { ...devices['Desktop Chrome'] },
     },
     {
@@ -63,6 +63,15 @@ export default defineConfig({
       use: {
         /** Roteiro longo: slowMo baixo; balões já pausam leitura. */
         ...demoVideoUse(95),
+      },
+    },
+    {
+      name: 'cfo-results-video',
+      testMatch: /cfo-demo-results-video\.spec\.ts/,
+      timeout: 1_200_000,
+      use: {
+        /** Ritmo mais pausado; ênfase no painel de maturidade. */
+        ...demoVideoUse(200),
       },
     },
   ],

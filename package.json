@@ -18,6 +18,7 @@
     "demo:video:cfo": "bash scripts/cfo-demo-video.sh",
     "demo:video:cfo-live": "bash scripts/cfo-demo-live-video.sh",
     "demo:video:cfo-full": "bash scripts/cfo-demo-full-video.sh",
+    "demo:video:cfo-results": "bash scripts/cfo-demo-results-video.sh",
     "inngest": "npx inngest-cli@latest dev",
     "setup": "bash scripts/setup.sh",
     "db:up": "bash scripts/db-up.sh",

@@ -16,7 +16,7 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      testIgnore: /(demo-rfy-video|cfo-demo-video|cfo-demo-live-video)\.spec\.ts/,
+      testIgnore: /(demo-rfy-video|cfo-demo-video|cfo-demo-live-video|cfo-demo-full-video)\.spec\.ts/,
       use: { ...devices['Desktop Chrome'] },
     },
     {
@@ -51,6 +51,18 @@ export default defineConfig({
         video: 'on',
         viewport: { width: 1280, height: 720 },
         launchOptions: { slowMo: 220 },
+      },
+    },
+    {
+      name: 'cfo-full-video',
+      testMatch: /cfo-demo-full-video\.spec\.ts/,
+      timeout: 1_200_000,
+      use: {
+        ...devices['Desktop Chrome'],
+        video: 'on',
+        viewport: { width: 1280, height: 720 },
+        /** Roteiro longo: slowMo baixo para vídeo mais curto; balões já pausam leitura. */
+        launchOptions: { slowMo: 95 },
       },
     },
   ],

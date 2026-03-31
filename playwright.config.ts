@@ -1,5 +1,18 @@
 import { defineConfig, devices } from '@playwright/test';
 
+/** Gravação 1920×1080; `--disable-dev-shm-usage` evita falhas de Chromium em Linux/servidor com /dev/shm pequeno (Docker, VPS). */
+function demoVideoUse(slowMo: number) {
+  return {
+    ...devices['Desktop Chrome'],
+    video: 'on' as const,
+    viewport: { width: 1920, height: 1080 },
+    launchOptions: {
+      slowMo,
+      args: ['--disable-dev-shm-usage'] as string[],
+    },
+  };
+}
+
 export default defineConfig({
   testDir: 'tests/e2e',
   fullyParallel: true,
@@ -24,11 +37,7 @@ export default defineConfig({
       testMatch: /demo-rfy-video\.spec\.ts/,
       timeout: 1_200_000,
       use: {
-        ...devices['Desktop Chrome'],
-        video: 'on',
-        viewport: { width: 1280, height: 720 },
-        /** Gravação mais lenta para narrar e acompanhar resultados no ecrã */
-        launchOptions: { slowMo: 220 },
+        ...demoVideoUse(220),
       },
     },
     {
@@ -36,10 +45,7 @@ export default defineConfig({
       testMatch: /cfo-demo-video\.spec\.ts/,
       timeout: 900_000,
       use: {
-        ...devices['Desktop Chrome'],
-        video: 'on',
-        viewport: { width: 1280, height: 720 },
-        launchOptions: { slowMo: 260 },
+        ...demoVideoUse(260),
       },
     },
     {
@@ -47,10 +53,7 @@ export default defineConfig({
       testMatch: /cfo-demo-live-video\.spec\.ts/,
       timeout: 1_200_000,
       use: {
-        ...devices['Desktop Chrome'],
-        video: 'on',
-        viewport: { width: 1280, height: 720 },
-        launchOptions: { slowMo: 220 },
+        ...demoVideoUse(220),
       },
     },
     {
@@ -58,11 +61,8 @@ export default defineConfig({
       testMatch: /cfo-demo-full-video\.spec\.ts/,
       timeout: 1_200_000,
       use: {
-        ...devices['Desktop Chrome'],
-        video: 'on',
-        viewport: { width: 1280, height: 720 },
-        /** Roteiro longo: slowMo baixo para vídeo mais curto; balões já pausam leitura. */
-        launchOptions: { slowMo: 95 },
+        /** Roteiro longo: slowMo baixo; balões já pausam leitura. */
+        ...demoVideoUse(95),
       },
     },
   ],

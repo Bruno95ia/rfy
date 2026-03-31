@@ -25,7 +25,7 @@ if [ -n "$LATEST" ]; then
   echo ""
   echo "==> Cópia estável: docs/demo/rfy-cfo-demo.webm ($(du -h docs/demo/rfy-cfo-demo.webm | cut -f1))"
   if command -v ffmpeg >/dev/null 2>&1; then
-    ffmpeg -y -i docs/demo/rfy-cfo-demo.webm -c:v libx264 -crf 22 -preset medium -movflags +faststart -an docs/demo/rfy-cfo-demo.mp4 -loglevel error -stats
+    bash "$(dirname "$0")/ffmpeg-webm-to-demo-mp4.sh" docs/demo/rfy-cfo-demo.webm docs/demo/rfy-cfo-demo.mp4
     echo "==> MP4: docs/demo/rfy-cfo-demo.mp4 ($(du -h docs/demo/rfy-cfo-demo.mp4 | cut -f1))"
   else
     echo "    (instale ffmpeg para gerar docs/demo/rfy-cfo-demo.mp4 automaticamente)"

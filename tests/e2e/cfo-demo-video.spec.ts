@@ -8,7 +8,7 @@ import type { Page } from '@playwright/test';
 
 const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-/** Balão fixo no ecrã (legível em 1280×720 gravado pelo Playwright). */
+/** Balão fixo no ecrã (legível em 1920×1080 gravado pelo Playwright). */
 async function showBalloon(page: Page, pointLabel: string, body: string, durationMs = 9000) {
   await page.evaluate(
     ({ label, text }) => {

@@ -17,7 +17,7 @@ if [ -n "$LATEST" ]; then
   echo ""
   echo "==> docs/demo/rfy-cfo-demo-full.webm ($(du -h docs/demo/rfy-cfo-demo-full.webm | cut -f1))"
   if command -v ffmpeg >/dev/null 2>&1; then
-    ffmpeg -y -i docs/demo/rfy-cfo-demo-full.webm -c:v libx264 -crf 22 -preset medium -movflags +faststart -an docs/demo/rfy-cfo-demo-full.mp4 -loglevel error -stats
+    bash "$(dirname "$0")/ffmpeg-webm-to-demo-mp4.sh" docs/demo/rfy-cfo-demo-full.webm docs/demo/rfy-cfo-demo-full.mp4
     echo "==> docs/demo/rfy-cfo-demo-full.mp4 ($(du -h docs/demo/rfy-cfo-demo-full.mp4 | cut -f1))"
   fi
 fi

@@ -1,10 +1,15 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import type { AdminDbClientType } from '@/lib/supabase/admin';
 import {
   getExecutiveData,
   buildExecutiveCsv,
   type ExecutiveData,
 } from '@/lib/reports/executive-data';
+
+function asAdminDb(mock: SupabaseClient): AdminDbClientType {
+  return mock as unknown as AdminDbClientType;
+}
 
 function createAdmin(options: {
   pipelineValueOpen?: number;
@@ -71,6 +76,30 @@ function createAdmin(options: {
         } as unknown as ReturnType<SupabaseClient['from']>;
       }
 
+      if (table === 'supho_paip_plans') {
+        return {
+          select: () => ({
+            eq: () => ({
+              eq: () => Promise.resolve({ data: [], error: null }),
+            }),
+          }),
+        } as unknown as ReturnType<SupabaseClient['from']>;
+      }
+
+      if (table === 'supho_diagnostic_results') {
+        return {
+          select: () => ({
+            eq: () => ({
+              order: () => ({
+                limit: () => ({
+                  maybeSingle: () => Promise.resolve({ data: null, error: null }),
+                }),
+              }),
+            }),
+          }),
+        } as unknown as ReturnType<SupabaseClient['from']>;
+      }
+
       throw new Error(`Unexpected table ${table}`);
     },
   };
@@ -98,7 +127,7 @@ describe('getExecutiveData', () => {
       ) as unknown as typeof fetch
     );
 
-    const data = await getExecutiveData(admin, 'org-1');
+    const data = await getExecutiveData(asAdminDb(admin), 'org-1');
 
     expect(data.pipeline_declarado).toBe(1_000_000);
     expect(data.receita_confiavel_30d).toBe(700_000);
@@ -114,7 +143,7 @@ describe('getExecutiveData', () => {
     vi.stubGlobal('fetch', fetchReject as unknown as typeof fetch);
 
     const admin = createAdmin({ pipelineValueOpen: 900_000 });
-    const data = await getExecutiveData(admin, 'org-1');
+    const data = await getExecutiveData(asAdminDb(admin), 'org-1');
 
     expect(fetchReject).toHaveBeenCalled();
     expect(data.rfy_source).toBe('fallback');
@@ -143,7 +172,7 @@ describe('getExecutiveData', () => {
       ) as unknown as typeof fetch
     );
 
-    const data = await getExecutiveData(admin, 'org-1');
+    const data = await getExecutiveData(asAdminDb(admin), 'org-1');
 
     expect(data.top_decisions).toHaveLength(2);
     expect(data.top_decisions[0]?.name).toBe('Proposta alto risco');
@@ -160,6 +189,7 @@ describe('buildExecutiveCsv', () => {
       receita_confiavel_30d: 700_000,
       receita_inflada: 300_000,
       pipeline_declarado: 1_000_000,
+      rfy_source: 'ai',
       top_decisions: [],
       evolution_90d: null,
       alertas: [],

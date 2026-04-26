@@ -12,7 +12,7 @@ import { computeImpact, suphoDiagnosticToResult } from '@/lib/rfy/impact-engine'
 import { buildImpactNarrative, buildImpactSecondaryLine } from '@/lib/rfy/narrative';
 import { governanceAndHygieneFromPillarScores } from '@/lib/rfy/pillar-scores';
 import { getPaipExecutionRate } from '@/lib/supho/paip-execution-rate';
-import { DashboardClient } from './DashboardClient';
+import { DashboardClient, type DashboardClientProps } from './DashboardClient';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { GettingStartedCard } from '@/components/layout/GettingStartedCard';
 import Link from 'next/link';

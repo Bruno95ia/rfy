@@ -1,5 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { NextRequest } from 'next/server';
 import { POST } from './route';
+
+vi.mock('@/lib/rfy/forecast-ai-payload', () => ({
+  buildForecastAiRequestBody: vi.fn().mockResolvedValue({ org_id: 'org1' }),
+}));
+
+vi.mock('@/lib/supabase/server', () => ({
+  createClient: vi.fn().mockResolvedValue({
+    auth: {
+      getUser: async () => ({ data: { user: null }, error: null }),
+    },
+    from: vi.fn(),
+  }),
+}));
 
 vi.mock('@/lib/auth', () => ({
   requireAuthAndOrgAccess: vi.fn(),
@@ -9,7 +23,7 @@ const { requireAuthAndOrgAccess } = await import('@/lib/auth');
 
 async function makeRequest(body: { org_id?: string }) {
   return POST(
-    new Request('http://localhost/api/ai/forecast', {
+    new NextRequest('http://localhost/api/ai/forecast', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),

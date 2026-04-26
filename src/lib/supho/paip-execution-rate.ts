@@ -1,11 +1,18 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { AdminDbClientType } from '@/lib/supabase/admin';
+import type { createClient } from '@/lib/supabase/server';
+
+/**
+ * Admin Postgres ou wrapper SSR (`createClient`): mesma cadeia `.from()` do `AdminDbClient`.
+ * Não inclui `SupabaseClient` JS (assinatura `.from()` incompatível na união).
+ */
+export type PaipDbClient = AdminDbClientType | Awaited<ReturnType<typeof createClient>>;
 
 /**
  * Taxa de execução PAIP = ações concluídas / total (plano ativo da org).
  * Retorna null se não houver ações cadastradas.
  */
 export async function getPaipExecutionRate(
-  supabase: SupabaseClient,
+  supabase: PaipDbClient,
   orgId: string
 ): Promise<number | null> {
   const { data: plans } = await supabase

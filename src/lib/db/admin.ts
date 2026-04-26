@@ -64,7 +64,12 @@ const allowedTableNames = new Set([
   'supho_answers',
   'supho_diagnostic_results',
   'supho_diagnostic_result_respondents',
-  'supho_paip_plans', 'metrics_status', 'app_users', 'app_sessions', 'form_invites',
+  'supho_paip_plans',
+  'supho_paip_gaps',
+  'supho_paip_objectives',
+  'supho_paip_krs',
+  'supho_paip_actions',
+  'metrics_status', 'app_users', 'app_sessions', 'form_invites',
 ]);
 
 function safeTable(table: string): string {

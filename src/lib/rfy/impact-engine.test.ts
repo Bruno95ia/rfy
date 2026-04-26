@@ -18,10 +18,16 @@ describe('computeImpact', () => {
     const r = computeImpact(
       suphoDiagnosticToResult(90, 90, 90),
       { pipelineOpenValue: 1_000_000 },
-      { governanceScore: 1, hygieneScore: 1, executionRate: 1 }
+      {
+        governanceScore: 1,
+        hygieneScore: 1,
+        executionRate: 1,
+        /** Sem fricção SUPHO, B=1 deixa Rc=Pd (cenário “ótimo” explícito no teste) */
+        baselineReliability: 1,
+      }
     );
-    expect(r.rfyScore).toBeGreaterThan(0.85);
-    expect(r.revenueInflated).toBeLessThan(50_000);
+    expect(r.rfyScore).toBe(1);
+    expect(r.revenueInflated).toBe(0);
     expect(r.totalFriction).toBe(0);
   });
 

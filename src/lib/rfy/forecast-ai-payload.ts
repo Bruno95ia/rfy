@@ -1,10 +1,9 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
 import { computeImpact, suphoDiagnosticToResult } from '@/lib/rfy/impact-engine';
-import { getPaipExecutionRate } from '@/lib/supho/paip-execution-rate';
+import { getPaipExecutionRate, type PaipDbClient } from '@/lib/supho/paip-execution-rate';
 
 /** Corpo JSON para POST /predict/forecast com multiplicadores RFY alinhados ao dashboard. */
 export async function buildForecastAiRequestBody(
-  supabase: SupabaseClient,
+  supabase: PaipDbClient,
   orgId: string
 ): Promise<{ org_id: string; rfy_score?: number; execution_rate?: number }> {
   let rfyScore: number | undefined;

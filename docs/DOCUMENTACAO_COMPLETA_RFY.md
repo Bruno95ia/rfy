@@ -349,7 +349,7 @@ O arquivo `docs/INFRAESTRUTURA_AWS.md` descreve alvo de produção: **VPC**, **E
 ## 14. Operação: backup, Git, segurança de segredos
 
 - **Backup:** `scripts/backup-db.sh` + `pg_dump`; política em `BACKUP-RESTORE.md`.
-- **Git:** branch `main`; não commitar `.env`, `.env.local`, chaves — ver `GIT.md`.
+- **Git:** branch `main`; não commitar `.env`, `.env.local`, chaves — ver `GIT.md`. **Validação local** recomendada (`npm install`, `npm run build`, `npm test`): `REPASSE_SOFTWARE.md` secção 13.1.
 - **Segredos:** usar `.env.example` como template; produção via Secret Manager ou env do provedor.
 
 ---
@@ -413,6 +413,7 @@ O arquivo `docs/INFRAESTRUTURA_AWS.md` descreve alvo de produção: **VPC**, **E
 | `PREPARACAO_MIGRACAO_INFRAESTRUTURA.md` | Checklist e plano por fases para migração de infraestrutura (cloud padrão, incl. **Opus Tech** / Smart IT) |
 | `BACKUP-RESTORE.md` | Backup/restore Postgres |
 | `GIT.md` | Fluxo Git |
+| `COMMIT_MESSAGE_TEMPLATE.txt` | Modelo opcional para `git config commit.template` |
 | `SAAS-FEATURES-ROADMAP.md` | Roadmap de features |
 | `PLANOS_POR_TEMA.md` | Planos de trabalho por tema |
 | `O_QUE_FALTA_RFY.md` | Lacunas |

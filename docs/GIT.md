@@ -7,10 +7,29 @@
 
 ## Boas práticas
 
-1. **Commits:** mensagens objetivas em português ou inglês, no imperativo (ex.: "Adiciona endpoint de export CSV", "Corrige cálculo de pillar score").
-2. **Branches de feature:** opcional usar `feature/nome-da-feature` ou `fix/nome-do-fix` e fazer merge em `main` após revisão/testes.
-3. **Não commitar:** `.env`, `.env.local`, chaves, `node_modules`, `.next`, `tmp/`, `output/`, venvs Python. O `.gitignore` já cobre isso.
-4. **Arquivo de exemplo:** use `.env.example` com variáveis sem valores sensíveis; o `.env.local` fica apenas local.
+1. **Commits:** mensagens objetivas em português ou inglês, no imperativo (ex.: "Adiciona endpoint de export CSV", "Corrige cálculo de pillar score"). Prefira prefixos convencionais: `feat:`, `fix:`, `docs:`, `chore:`, `refactor:`, `test:`.
+2. **Mensagem final:** use só o título e o corpo que descrevem a mudança. Evite linhas de meta não versionáveis (ex.: "Made-with: …") no texto que vai para o histórico do Git.
+3. **Branches de feature:** opcional usar `feature/nome-da-feature` ou `fix/nome-do-fix` e fazer merge em `main` após revisão/testes.
+4. **Não commitar:** `.env`, `.env.local`, chaves, `node_modules`, `.next`, `tmp/`, `output/`, venvs Python. O `.gitignore` já cobre isso.
+5. **Arquivo de exemplo:** use `.env.example` com variáveis sem valores sensíveis; o `.env.local` fica apenas local.
+
+## Modelo de mensagem de commit
+
+- Ao correr `git commit` sem `-m`, o Git abre `.git/COMMIT_EDITMSG`: a **primeira linha não vazia** (que não seja só comentário `#`) vira o assunto; linhas que começam com `#` são ignoradas.
+- Modelo versionado (opcional): ficheiro [`COMMIT_MESSAGE_TEMPLATE.txt`](COMMIT_MESSAGE_TEMPLATE.txt). Para usar em todos os commits deste clone:
+
+  ```bash
+  git config commit.template docs/COMMIT_MESSAGE_TEMPLATE.txt
+  ```
+
+Exemplo de commit final (sem linhas `#` no histórico):
+
+```
+docs: descreve validação local no repasse
+
+- Secção 13.1 em REPASSE_SOFTWARE (build + testes).
+- GIT.md e template de mensagem.
+```
 
 ## Comandos úteis
 

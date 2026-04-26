@@ -199,9 +199,19 @@ Sempre validar `org_id` e permissões; rate limit em rotas sensíveis.
 
 ## 13. Testes e qualidade
 
-- `npm run lint` — ESLint em `src`.
+- `npm run lint` — ESLint em `src` (em pastas sincronizadas com OneDrive ou disco rede o comando pode demorar vários minutos).
 - `npm test` / `npm run test:watch` — Vitest com cobertura.
 - `npm run test:e2e` — Playwright (fluxo completo ainda é lacuna parcial segundo docs).
+
+### 13.1 Validação mínima antes de PR ou deploy
+
+Ordem recomendada:
+
+1. `npm install` — garantir dependências (sem `node_modules` completo, `next build` pode falhar com *module not found* para pacotes já listados no `package.json`).
+2. `npm run build` — compilação de produção + checagem TypeScript do projeto Next.
+3. `npm test` — suite Vitest (unitário + integração leve em `tests/` e `src/**/*.test.ts`).
+
+Se `npm run build` ou `npm test` falharem, corrija antes de integrar em `main`; ver também [`GIT.md`](GIT.md) e o modelo opcional [`COMMIT_MESSAGE_TEMPLATE.txt`](COMMIT_MESSAGE_TEMPLATE.txt) para mensagens de commit.
 
 ---
 

@@ -1,0 +1,7 @@
+# <Assunto: tipo: descrição curta em imperativo, ~72 caracteres>
+# Tipos usuais: feat | fix | docs | chore | refactor | test
+#
+# Corpo opcional (descomente ou apague as linhas # abaixo):
+#
+# - ...
+# - ...

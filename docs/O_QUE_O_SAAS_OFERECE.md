@@ -1,8 +1,10 @@
 O que o SaaS RFY oferece
 
-RFY é uma Plataforma de Governança Empresarial com porta de entrada em Receita Confiável, baseada no RFY Index — o percentual de Receita Confiável nos próximos 30 dias, calculado independentemente da data de fechamento declarada no CRM.
+> **Consolidação:** a especificação funcional completa está em **[`DOCUMENTACAO_COMPLETA_RFY.md`](DOCUMENTACAO_COMPLETA_RFY.md#4-parte-funcional-consolidada)** (secção 4). Este arquivo permanece como referência textual detalhada e histórico de alinhamento.
 
-Regra de ouro do produto: na superfície, o RFY é simples (número oficial + decisão). Em profundidade, ele é robusto (execução + diagnóstico + governança).
+RFY é uma Plataforma de Governança Empresarial: **SUPHO** (maturidade organizacional — ITSMO, pilares Cultura/Humano/Performance, PAIP, rituais e certificação) é a **estrela do produto** — diferenciação metodológica e narrativa central. Em paralelo, o **RFY Index** mede a **Receita Confiável** nos próximos 30 dias, calculada independentemente da data de fechamento declarada no CRM.
+
+Regra de ouro do produto: na primeira dobra do dashboard, o cliente vê **RFY Index + SUPHO (ITSMO)** lado a lado; em profundidade, execução (intervenções, pipeline), diagnóstico completo e governança (PAIP, rituais, certificação).
 
 Este documento descreve as funcionalidades disponíveis na plataforma.
 
@@ -10,10 +12,12 @@ Este documento descreve as funcionalidades disponíveis na plataforma.
 
 0. Arquitetura do produto (como as camadas se conectam)
 
-O RFY mantém todas as camadas desde o início, porém com hierarquia clara:
+O RFY mantém todas as camadas desde o início, com hierarquia atualizada: **SUPHO e RFY Index compartilham o topo da experiência** (hero do dashboard); abaixo, execução e governança se desdobram.
 
-Camada 1 — Verdade da Receita (categoria / entrada)
-	•	RFY Index (30 dias) como número oficial de Receita Confiável.
+Camada 0 — Experiência central (hero)
+	•	**RFY Index (30 dias)** como número oficial de Receita Confiável e **SUPHO · ITSMO** como índice de maturidade no mesmo bloco — acesso rápido ao Painel de Maturidade.
+
+Camada 1 — Verdade da Receita (detalhe)
 	•	Receita Confiável (R$) e Receita Inflada (R$) como visão financeira executiva.
 	•	Evolução histórica do índice e comparação com benchmark (quando disponível).
 
@@ -21,13 +25,13 @@ Camada 2 — Execução (mecanismo)
 	•	Intervenções priorizadas por impacto para reduzir Receita Inflada e aumentar RFY.
 	•	Deal Intelligence e saúde do pipeline para orientar ação.
 
-Camada 3 — Diagnóstico Organizacional (SUPHO — ativado após diagnóstico inicial)
-	•	SUPHO é uma ferramenta de diagnóstico organizacional que explica por que o RFY está no nível atual.
-	•	Entra após o cliente entender o RFY (Camada 1) e precisar sustentar melhoria (Camadas 1 e 2).
+Camada 3 — Profundidade SUPHO (diagnóstico e plano)
+	•	Diagnóstico organizacional completo (campanhas, IC/IH/IP, níveis).
 	•	Simulador de impacto (estrutural): “se maturidade subir X, o RFY tende a subir Y”.
+	•	PAIP, rituais e certificação como sustentação da evolução.
 
-Camada 4 — Governança (escala e institucionalização)
-	•	Rituais, PAIP e certificação como mecanismos de sustentação e padronização.
+Camada 4 — Governança operacional
+	•	Configurações, integrações, alertas e integrações CRM em escala.
 
 ⸻
 
@@ -90,8 +94,9 @@ O dashboard é a Torre de Controle de Receita: começa pelo RFY Index e pela lin
 	•	Tabela de deals em risco: receita potencialmente comprometida (Receita Inflada) por oportunidade para priorizar ação.
 
 3.8 SUPHO (resumo no dashboard)
-	•	Card com último resultado de diagnóstico: ITSMO, nível, pilares IC/IH/IP, gaps (C–H, C–P), links para Diagnóstico e Painel de Maturidade.
-	•	Importante: SUPHO é ativado após diagnóstico inicial e serve para explicar e sustentar a evolução do RFY.
+	•	No **hero**, cartão **SUPHO · Maturidade** com ITSMO (ou convite a iniciar diagnóstico), nível e foco em pilar, link para `/app/supho/maturidade`.
+	•	Na área avançada, card detalhado com último resultado: pilares IC/IH/IP, gaps (C–H, C–P), links para Diagnóstico e Painel de Maturidade.
+	•	Após primeira campanha fechada, o resultado sustenta a leitura executiva e a evolução do RFY; simulador de impacto estrutural quando disponível.
 
 3.9 Posicionamento no mercado
 	•	Comparativo com benchmark e análise de ICP (Ideal Customer Profile) quando disponível.
@@ -266,7 +271,7 @@ Configurações são organizadas em abas/filtros: Visão geral, SaaS, Organizaç
 
 | Persona | Principais recursos |
 |---------|---------------------|
-| CEO / Conselho | RFY Index (número oficial), Receita Confiável, Receita Inflada, evolução, Top 3 decisões, benchmark. |
+| CEO / Conselho | RFY Index, **SUPHO (ITSMO)** no hero, Receita Confiável, Receita Inflada, evolução, Top 3 decisões, benchmark. |
 | Gestor comercial | Intervenções, Deal Intelligence, saúde do pipeline, relatórios, análise detalhada. |
 | Liderança | SUPHO (diagnóstico), simulador de impacto, PAIP, rituais, certificação. |
 | Operação | Uploads, templates, integração CRM/webhook, configurações (limiares, notificações). |
@@ -275,4 +280,4 @@ Configurações são organizadas em abas/filtros: Visão geral, SaaS, Organizaç
 
 ⸻
 
-Documento atualizado com base no alinhamento estratégico: RFY Index (Receita Confiável 30 dias) como porta de entrada; SUPHO como diagnóstico ativado após diagnóstico inicial e com simulador de impacto estrutural. Data: fevereiro/2026.
+Documento atualizado: **SUPHO** como estrela do produto (hero + jornada completa); **RFY Index** como motor quantitativo de Receita Confiável (30 dias). Simulador de impacto estrutural conforme disponível. Última revisão: abril/2026.

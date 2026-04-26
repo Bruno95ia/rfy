@@ -4,6 +4,7 @@
  */
 import type { AdminDbClientType } from '@/lib/supabase/admin';
 import { computeRfySummary } from '@/lib/metrics/rfy-summary';
+import { buildForecastAiRequestBody } from '@/lib/rfy/forecast-ai-payload';
 
 const AI_BASE = process.env.AI_SERVICE_URL ?? 'http://localhost:8001';
 const AI_FETCH_TIMEOUT_MS = 20000;
@@ -39,12 +40,13 @@ export async function getExecutiveData(
   let forecastAdjusted: number | null = null;
   let pipelineBruto: number | null = null;
   try {
+    const aiBody = await buildForecastAiRequestBody(admin, orgId);
     const controller = new AbortController();
     const t = setTimeout(() => controller.abort(), AI_FETCH_TIMEOUT_MS);
     const res = await fetch(`${AI_BASE}/predict/forecast`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ org_id: orgId }),
+      body: JSON.stringify(aiBody),
       signal: controller.signal,
     });
     clearTimeout(t);

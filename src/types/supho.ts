@@ -83,3 +83,16 @@ export type SuphoPerfilPredominante =
   | 'performance_maior'
   | 'evolutivo'
   | 'fragmentado';
+
+/** Pilar alinhado à ação PAIP (IH = liderança) */
+export type SuphoPaipPillar = 'culture' | 'commercial' | 'people' | 'leadership';
+
+/** Campos opcionais em `supho_paip_actions` para previsão de impacto */
+export interface SuphoPaipActionImpactFields {
+  pillar?: SuphoPaipPillar | null;
+  owner_id?: string | null;
+  due_at?: string | null;
+  expected_impact_rfy?: number | null;
+  expected_revenue_gain?: number | null;
+  status?: string | null;
+}

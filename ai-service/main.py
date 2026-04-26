@@ -70,6 +70,8 @@ class PredictDealRequest(BaseModel):
 
 class PredictForecastRequest(BaseModel):
     org_id: str
+    rfy_score: float | None = None
+    execution_rate: float | None = None
 
 
 class BenchmarkCompanyRequest(BaseModel):
@@ -185,6 +187,8 @@ def api_predict_forecast(req: PredictForecastRequest) -> dict[str, Any]:
                 activities_by_hash,
                 org_baselines,
                 seller_stats,
+                rfy_score=req.rfy_score,
+                execution_rate=req.execution_rate,
             )
         return result
     except Exception as e:

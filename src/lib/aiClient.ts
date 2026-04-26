@@ -93,12 +93,19 @@ export async function predictDeal(dealId: string, orgId: string): Promise<Predic
   });
 }
 
-export async function predictForecast(orgId: string): Promise<PredictForecastResponse> {
+export async function predictForecast(
+  orgId: string,
+  opts?: { rfyScore?: number; executionRate?: number }
+): Promise<PredictForecastResponse> {
   const base = getBaseUrl();
   const path = base ? '/predict/forecast' : '/api/ai/forecast';
   return fetchAi<PredictForecastResponse>(path, {
     method: 'POST',
-    body: JSON.stringify({ org_id: orgId }),
+    body: JSON.stringify({
+      org_id: orgId,
+      rfy_score: opts?.rfyScore,
+      execution_rate: opts?.executionRate,
+    }),
   });
 }
 

@@ -43,6 +43,8 @@ import { DashboardKpiGrid } from './components/make/DashboardKpiGrid';
 import { DashboardDecisionsSection } from './components/make/DashboardDecisionsSection';
 import { DashboardAlertsSection } from './components/make/DashboardAlertsSection';
 import { DashboardAdvancedSection } from './components/make/DashboardAdvancedSection';
+import { ImpactLayerCard } from './components/ImpactLayerCard';
+import type { SuphoPillar } from '@/types/rfy-impact';
 
 type DatePreset =
   | 'all'
@@ -92,6 +94,20 @@ export interface DashboardClientProps {
   pillarScores: Record<string, unknown> | null;
   generatedAt: string | null;
   suphoResult?: SuphoDashboardResult | null;
+  impactSummary?: {
+    rfyScore: number;
+    revenueDeclared: number;
+    revenueReliable: number;
+    revenueAtRisk: number;
+    revenueRecoverable: number;
+    revenueInflated: number;
+    totalFriction: number;
+    topImpactDrivers: Array<{ pillar: SuphoPillar; label: string; loss: number }>;
+    forecastOptimized: number;
+    narrative: string;
+    narrativeSecondary: string;
+  } | null;
+  paipExecutionRate?: number | null;
   unitEconomics?: Record<string, unknown> | null;
   icpCached?: {
     icp_summary: string;
@@ -120,6 +136,7 @@ function mapSeverity(severity: string): 'critical' | 'warning' | 'info' {
 }
 
 const ADVANCED_NAV_DEFAULT: Array<[string, string]> = [
+  ['#impacto-rfy', 'Impacto RFY'],
   ['#posicionamento', 'Posicionamento'],
   ['#intervencoes', 'Intervenções'],
   ['#receita-declarada-vs-confiavel', 'Receita declarada vs confiável'],
@@ -128,6 +145,7 @@ const ADVANCED_NAV_DEFAULT: Array<[string, string]> = [
 ];
 
 const ADVANCED_NAV_EXECUTIVE: Array<[string, string]> = [
+  ['#impacto-rfy', 'Impacto RFY'],
   ['#posicionamento', 'Posicionamento'],
   ['#receita-declarada-vs-confiavel', 'Receita declarada vs confiável'],
   ['#supho', 'SUPHO'],
@@ -148,6 +166,8 @@ export function DashboardClient({
   pillarScores,
   generatedAt,
   suphoResult = null,
+  impactSummary = null,
+  paipExecutionRate = null,
   unitEconomics = null,
   icpCached = null,
   initialMetricsDefinitionVersion = null,
@@ -252,7 +272,10 @@ export function DashboardClient({
 
       try {
         const [forecastRes, benchmarkRes, interventionsRes] = await Promise.all([
-          predictForecast(orgId),
+          predictForecast(orgId, {
+            rfyScore: impactSummary?.rfyScore,
+            executionRate: paipExecutionRate ?? undefined,
+          }),
           getBenchmark(orgId),
           getInterventions(orgId).catch(() => [] as Awaited<ReturnType<typeof getInterventions>>),
         ]);
@@ -287,7 +310,7 @@ export function DashboardClient({
     return () => {
       mounted = false;
     };
-  }, [orgId]);
+  }, [orgId, impactSummary?.rfyScore, paipExecutionRate]);
 
   useEffect(() => {
     if (!orgId) return;
@@ -774,6 +797,7 @@ export function DashboardClient({
 
       <DashboardHero
         rfyIndex={rfyIndexPct != null ? Math.round(rfyIndexPct) : null}
+        structuralRfyScore={impactSummary?.rfyScore ?? null}
         rfySource={rfySource}
         variationPct={aiDiferencaPct}
         lastUpdated={reportGeneratedAt}
@@ -830,6 +854,26 @@ export function DashboardClient({
           },
         ]}
       />
+
+      {impactSummary && (
+        <section id="impacto-rfy" className="scroll-mt-5">
+          <ImpactLayerCard
+            rfyScore={impactSummary.rfyScore}
+            revenueDeclared={impactSummary.revenueDeclared}
+            revenueReliable={impactSummary.revenueReliable}
+            revenueAtRisk={impactSummary.revenueAtRisk}
+            revenueRecoverable={impactSummary.revenueRecoverable}
+            revenueInflated={impactSummary.revenueInflated}
+            totalFriction={impactSummary.totalFriction}
+            topImpactDrivers={impactSummary.topImpactDrivers}
+            forecastCurrent={receitaConfiavelValor ?? 0}
+            forecastOptimized={impactSummary.forecastOptimized}
+            narrative={impactSummary.narrative}
+            narrativeSecondary={impactSummary.narrativeSecondary}
+            formatCurrency={formatCurrency}
+          />
+        </section>
+      )}
 
       <section className="grid gap-5 xl:grid-cols-12">
         <DashboardDecisionsSection decisions={decisionsView} className="xl:col-span-8" />
@@ -1022,7 +1066,7 @@ export function DashboardClient({
       </DashboardAdvancedSection>
 
       <footer className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 text-center text-xs text-[var(--color-text-muted)]">
-        RFY © 2026 · Dashboard executivo alinhado ao modelo Figma Make · SUPHO como diagnóstico secundário.
+        RFY © 2026 · Dashboard executivo alinhado ao modelo Figma Make · RFY Index + SUPHO (maturidade ITSMO) em destaque no hero.
       </footer>
     </div>
   );

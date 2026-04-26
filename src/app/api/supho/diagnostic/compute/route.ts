@@ -20,6 +20,7 @@ import {
   applyIpPenaltyUnrounded,
   assessSystemsMaturity,
 } from '@/lib/supho/systems-maturity';
+import { computeImpact, suphoDiagnosticToResult } from '@/lib/rfy/impact-engine';
 import type { SuphoQuestionAverage } from '@/types/supho';
 import { requireApiCampaignAccess } from '@/lib/auth';
 
@@ -221,6 +222,12 @@ export async function POST(req: NextRequest) {
       return row && String(row.body_markdown ?? '').trim().length > 0;
     }).length;
 
+    const impact = computeImpact(
+      suphoDiagnosticToResult(result.ic, result.ih, result.ip),
+      { pipelineOpenValue: 0 },
+      {}
+    );
+
     const resultJson = {
       questionAverages: result.questionAverages,
       seed: null,
@@ -263,6 +270,7 @@ export async function POST(req: NextRequest) {
       orgContextSummary: orgContextSummary || null,
       knowledgeFilesUsed,
       uploadsSynthesisUsed: Boolean(uploadsSynth),
+      impact,
     };
 
     const { error: insertError } = await admin.from('supho_diagnostic_results').insert({
@@ -309,6 +317,7 @@ export async function POST(req: NextRequest) {
         systemsAdjusted: systemsAdjustedMeta,
         orgContextPresent: resultJson.orgContextPresent,
         sourcesUsedInCompute: resultJson.sourcesUsedInCompute,
+        impact,
       },
     });
   } catch (e) {

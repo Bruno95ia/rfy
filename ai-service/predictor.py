@@ -104,6 +104,8 @@ def predict_forecast(
     activities_by_hash: dict[str, list[dict]],
     org_baselines: dict[str, dict[str, float]],
     seller_stats: dict[str, dict[str, float]],
+    rfy_score: float | None = None,
+    execution_rate: float | None = None,
 ) -> dict[str, Any]:
     """
     Forecast ajustado: Σ(deal_value * P(win)).
@@ -160,6 +162,17 @@ def predict_forecast(
     diferença_percentual = (
         (diff / pipeline_bruto * 100) if pipeline_bruto > 0 else 0.0
     )
+
+    # Multiplicador RFY: forecast = f(pipeline, rfyScore, executionRate) — maturidade e execução PAIP
+    if rfy_score is not None:
+        rs = max(0.0, min(1.0, float(rfy_score)))
+        er = 0.65 if execution_rate is None else max(0.0, min(1.0, float(execution_rate)))
+        rfy_mult = 0.78 + 0.22 * rs * (0.7 + 0.3 * er)
+        forecast_adjusted = round(forecast_adjusted * rfy_mult, 2)
+        diff = pipeline_bruto - forecast_adjusted
+        diferença_percentual = (
+            (diff / pipeline_bruto * 100) if pipeline_bruto > 0 else 0.0
+        )
 
     # Confiança do forecast: alta só com modelo treinado e base com volume mínimo
     fallback = clf_art is None

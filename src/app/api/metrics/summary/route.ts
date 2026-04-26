@@ -9,6 +9,7 @@ import { requireAuthAndOrgAccess } from '@/lib/auth';
 import { computeRfySummary } from '@/lib/metrics/rfy-summary';
 import { METRICS_DEFINITION_VERSION } from '@/lib/metrics/definitions';
 import { isMissingMetricsDefinitionColumnError } from '@/lib/metrics/schema-fallback';
+import { buildForecastAiRequestBody } from '@/lib/rfy/forecast-ai-payload';
 
 const AI_BASE = process.env.AI_SERVICE_URL ?? 'http://localhost:8001';
 const AI_FETCH_TIMEOUT_MS = 25000;
@@ -62,12 +63,13 @@ export async function GET(req: NextRequest) {
   let forecastAdjusted: number | null = null;
   let pipelineBruto: number | null = null;
   try {
+    const aiBody = await buildForecastAiRequestBody(admin, auth.orgId);
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), AI_FETCH_TIMEOUT_MS);
     const res = await fetch(`${AI_BASE}/predict/forecast`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ org_id: auth.orgId }),
+      body: JSON.stringify(aiBody),
       signal: controller.signal,
     });
     clearTimeout(timeoutId);

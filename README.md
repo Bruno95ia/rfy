@@ -1,6 +1,6 @@
 # RFY - Revenue Friction Engine
 
-MVP SaaS para análise de fricções de receita a partir de CSVs do PipeRun. Dashboard com métricas de pipeline, fricções e pillar scores.
+Plataforma de governança empresarial: **SUPHO** (maturidade organizacional — ITSMO, diagnóstico, PAIP, rituais) como **estrela do produto**, com **RFY Index** e métricas de **Receita Confiável / Inflada** a partir de CSVs PipeRun (ou webhook). Dashboard com hero **RFY + SUPHO** e análises de pipeline.
 
 ## Documentação do sistema
 

@@ -2,9 +2,11 @@
 
 ## O que é o RFY
 
-O **RFY** é uma plataforma de **Governança de Receita** que ajuda empresas a ter clareza sobre a receita que podem realmente contar nos próximos 30 dias. O centro da oferta é o **RFY Index**: um único número (em %) que representa a parcela do pipeline considerada **Receita Confiável**, calculada com base em dados do CRM e em previsão (IA ou regra de negócio), sem depender apenas da data de fechamento declarada.
+O **RFY** é uma plataforma de **Governança Empresarial** que une **receita confiável** e **maturidade organizacional**. A **estrela do produto** é o **SUPHO**: diagnóstico em pilares Cultura, Humano e Performance (índice **ITSMO**), Painel de Maturidade, **PAIP**, rituais e certificação — a metodologia que explica *por que* a receita se comporta como se comporta e *como* evoluir com plano e governança.
 
-**Problema que resolve:** substituir o "feeling" e planos baseados em datas otimistas por um número oficial de receita realizável, decisões priorizadas e diagnóstico organizacional para sustentar a melhoria.
+No mesmo painel, o **RFY Index** (%) traduz a **Receita Confiável** dos próximos 30 dias a partir do CRM e da previsão (IA ou heurística), sem depender só da data de fechamento declarada — o **motor quantitativo** que mede pipeline e prioriza ações.
+
+**Problema que resolve:** substituir intuição e datas otimistas por **número oficial de receita realizável** *e* **diagnóstico estrutural** da organização que sustenta (ou limita) esse resultado.
 
 ---
 
@@ -12,7 +14,7 @@ O **RFY** é uma plataforma de **Governança de Receita** que ajuda empresas a t
 
 ### 1. Torre de Controle (Dashboard)
 
-- **RFY Index:** número oficial em destaque — percentual de Receita Confiável nos próximos 30 dias.
+- **Hero integrado:** **RFY Index** (Receita Confiável em %) e **SUPHO · Maturidade (ITSMO)** no mesmo destaque, com atalho para o Painel de Maturidade.
 - **Receita Confiável e Receita Inflada:** valores em R$ (o que tende a fechar vs. o que está em risco ou distorcido).
 - **Top 3 decisões:** ações priorizadas por impacto para aumentar a confiabilidade da receita.
 - **Alertas:** resumo de riscos (ex.: pipeline estagnado, proposta parada) com link para detalhes.
@@ -20,13 +22,13 @@ O **RFY** é uma plataforma de **Governança de Receita** que ajuda empresas a t
 - **Painel executivo:** visão consolidada de receita, saúde do pipeline e próximos passos.
 - **Indicador de origem:** quando a IA está indisponível, o sistema indica que está usando estimativa heurística (fallback).
 
-Ideal para: CEO, conselho e gestores que precisam de um "número da verdade" e de priorização clara.
+Ideal para: CEO, conselho e gestores que precisam de **número da verdade na receita** e de **linha de maturidade** no mesmo lugar.
 
 ---
 
-### 2. Diagnóstico organizacional (SUPHO)
+### 2. Diagnóstico organizacional (SUPHO) — núcleo da oferta
 
-O **SUPHO** é o módulo de diagnóstico que explica **por que** o RFY está no nível atual e como evoluir.
+O **SUPHO** é o módulo que explica **por que** o RFY está no nível atual e **como** evoluir — protagonista da narrativa comercial e do fluxo de valor.
 
 - **Diagnóstico:** campanhas de pesquisa, respondentes, questões e cálculo dos índices (Cultura, Humano, Performance e índice geral ITSMO).
 - **Painel de Maturidade:** visão em radar dos três pilares, nível organizacional (Reativo → Evolutivo) e leitura executiva.
@@ -104,11 +106,11 @@ Ideal para: administradores e gestores que configuram limites, pessoas e notific
 
 O RFY entrega:
 
-1. **Um número oficial** — RFY Index (Receita Confiável em 30 dias).
-2. **Clareza de risco** — Receita Inflada e evidências por distorção.
-3. **Decisões priorizadas** — Top 3 ações e Deal Intelligence.
-4. **Diagnóstico e evolução** — SUPHO, PAIP, rituais e certificação.
+1. **SUPHO como estrela** — Maturidade organizacional (ITSMO, pilares, PAIP, rituais, certificação).
+2. **Um número oficial na receita** — RFY Index (Receita Confiável em 30 dias).
+3. **Clareza de risco** — Receita Inflada e evidências por distorção.
+4. **Decisões priorizadas** — Top 3 ações e Deal Intelligence.
 5. **Dados e integração** — CSV, webhook e centro de integrações.
 6. **Governança** — Configurações, convites, alertas e relatórios agendados.
 
-Tudo em uma única plataforma, com foco em simplicidade na superfície e profundidade quando o usuário precisar.
+Tudo em uma única plataforma: **receita + maturidade** na primeira dobra; profundidade nos módulos SUPHO e análises avançadas.

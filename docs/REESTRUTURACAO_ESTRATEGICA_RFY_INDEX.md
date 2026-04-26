@@ -4,6 +4,8 @@
 **Base:** Análise do documento *O que o SaaS RFY oferece* e da artefatura técnica existente  
 **Data:** Fevereiro/2026
 
+> **Atualização abril/2026:** o produto evoluiu para integrar **SUPHO no hero do dashboard** (ITSMO ao lado do RFY Index) e reforçar o **SUPHO como estrela da narrativa** comercial. As seções abaixo que tratam SUPHO como “não aparece no topo” ou apenas plano premium refletem **esta proposta de fevereiro**, não o estado atual da UI. Para posicionamento vigente, usar [`DOCUMENTACAO_COMPLETA_RFY.md`](DOCUMENTACAO_COMPLETA_RFY.md) e o código em `src/app/app/dashboard/components/make/DashboardHero.tsx`.
+
 ---
 
 ## Resumo executivo

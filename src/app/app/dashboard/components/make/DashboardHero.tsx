@@ -11,6 +11,8 @@ interface HeroDecision {
 
 interface DashboardHeroProps {
   rfyIndex: number | null;
+  /** Score RFY causal (maturidade 0–1), do Impact Engine */
+  structuralRfyScore?: number | null;
   /** 'fallback' = estimativa heurística (AI indisponível); 'ai' = forecast do modelo */
   rfySource?: 'ai' | 'fallback' | null;
   variationPct: number | null;
@@ -27,6 +29,7 @@ interface DashboardHeroProps {
 
 export function DashboardHero({
   rfyIndex,
+  structuralRfyScore = null,
   rfySource = null,
   variationPct,
   lastUpdated,
@@ -83,6 +86,15 @@ export function DashboardHero({
             <p className="mt-3 max-w-2xl text-sm leading-relaxed text-[var(--color-text-muted)] sm:text-base">
               Indicador central de Receita Confiável para os próximos 30 dias, calculado sem depender da data declarada de fechamento no CRM.
             </p>
+            {structuralRfyScore != null && (
+              <p className="mt-2 text-sm text-[var(--color-text-muted)]">
+                Score RFY (impacto SUPHO):{' '}
+                <span className="font-semibold tabular-nums text-[var(--color-text)]">
+                  {structuralRfyScore.toFixed(2)}
+                </span>{' '}
+                / 1,00 — quanto mais próximo de 1, menor o arrasto estrutural sobre a receita.
+              </p>
+            )}
 
             {rfySource === 'fallback' && (
               <p className="mt-2 rounded-md border border-[var(--color-warning)]/40 bg-[var(--color-warning-soft)] px-3 py-2 text-xs text-[var(--color-warning-foreground)]">

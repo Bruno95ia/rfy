@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requireAuthAndOrgAccess } from '@/lib/auth';
 import { computeRfySimulation } from '@/lib/simulations/rfy';
+import { buildForecastAiRequestBody } from '@/lib/rfy/forecast-ai-payload';
 
 const AI_BASE = process.env.AI_SERVICE_URL ?? 'http://localhost:8001';
 const AI_FETCH_TIMEOUT_MS = 20000;
@@ -39,12 +40,13 @@ export async function POST(req: NextRequest) {
   let forecastAdjusted: number | null = null;
   let pipelineBruto: number | null = null;
   try {
+    const aiBody = await buildForecastAiRequestBody(admin, auth.orgId);
     const controller = new AbortController();
     const t = setTimeout(() => controller.abort(), AI_FETCH_TIMEOUT_MS);
     const res = await fetch(`${AI_BASE}/predict/forecast`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ org_id: auth.orgId }),
+      body: JSON.stringify(aiBody),
       signal: controller.signal,
     });
     clearTimeout(t);
